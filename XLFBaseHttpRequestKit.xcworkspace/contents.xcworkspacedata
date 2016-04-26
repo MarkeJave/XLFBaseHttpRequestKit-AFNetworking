@@ -7,4 +7,7 @@
    <FileRef
       location = "group:XLFBaseHttpRequestKit.xcodeproj">
    </FileRef>
+   <FileRef
+      location = "group:AFNetworking/AFNetworking.xcodeproj">
+   </FileRef>
 </Workspace>

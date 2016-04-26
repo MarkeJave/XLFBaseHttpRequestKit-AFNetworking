@@ -8,6 +8,7 @@
 //
 
 #import <objc/runtime.h>
+#import <AFNetWorking/AFURLResponseSerialization.h>
 
 #import "XLFHttpRequestManager.h"
 #import "MBProgressHUDPrivate.h"
@@ -146,6 +147,8 @@ NSString *const XLFCachePathFolder       = @"WebCache";
 
 XLFVisibleViewControllerBlock   XLFGloableVisibleVCBlock = nil;
 XLFListeningErrorBlock          XLFGloableListeningErrorBlock = nil;
+
+FOUNDATION_EXPORT NSString * const AFURLResponseSerializationErrorDomain;
 
 static NSError * XLFErrorWithUnderlyingError(NSError *error, NSError *underlyingError) {
     if (!error) {
@@ -350,7 +353,7 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
 
 @interface XLFHttpRequestManager (Private)
 
-@property(nonatomic, strong) NSMutableDictionary *evreqReferrence;
+@property(nonatomic, strong) NSMutableDictionary *referrence;
 
 @end
 
@@ -397,7 +400,9 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
 
 - (NSString *)description{
     
-    return [@{@"handle":ntoe([self handle]),
+    return [@{@"url":ntoe([[self requestURL] absoluteString]),
+              @"method":ntoe([self method]),
+              @"handle":ntoe([self handle]),
               @"queryParameters":ntodefault([self queryParameters], @{}),
               @"formParameters":ntodefault([self formParameters], @{}),
               @"postBody":ntodefault([self postBody], @{}),
@@ -411,10 +416,11 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
 
 - (void)clearProperties{
     
-    if ([self container] && [[self container] evreqReferrence]) {
-        [[[self container] evreqReferrence] removeObjectForKey:[NSNumber numberWithInteger:[self taskTag]]];
+    @synchronized ([self container]) {
+        if ([self container] && [[self container] referrence]) {
+            [[[self container] referrence] removeObjectForKey:[NSNumber numberWithInteger:[self taskTag]]];
+        }
     }
-    
     if ([self relationObject]) {
         [[[self relationObject] httpRequestSetter] removeHttpRequest:self];
     }
@@ -424,7 +430,7 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
 
 - (NSDictionary*)descriptionInfo{
     
-    return @{@"url":ntoe([[[self currentRequest] URL] absoluteString]),
+    return @{@"url":ntoe([[[self httpParameter] requestURL] absoluteString]),
              @"handle":ntoe([[self httpParameter] handle]),
              @"method":ntoe([[self httpParameter] method]),
              @"queryParameters":ntodefault([[self httpParameter] queryParameters], @{}),
@@ -456,7 +462,7 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
     }
 }
 
-- (UIView<XLFProgressViewDelegate> *)httpParameter{
+- (XLFHttpParameter *)httpParameter{
     
     return objc_getAssociatedObject(self, @selector(httpParameter));
 }
@@ -710,11 +716,9 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
             
             NIF_INFO(@"Http Request Response: %@", result);
             
-#if NS_BLOCKS_AVAILABLE
             if (success) {
-                success(self , result);
+                success(self, result);
             }
-#endif
         }
         else{
             
@@ -727,18 +731,14 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
 
 - (nullable void (^)(NSError *error, XLFFailedBlock failure))taskFailed{
     
+    @weakify(self);
     return ^(NSError *error,  XLFFailedBlock failure){
+        @strongify(self);
         
         NIF_ERROR(@"%@", error);
         
         NSError *newError = [self systemErrorWithStatusCode:[(NSHTTPURLResponse *)[self response] statusCode]
                                                   errorCode:[error code]];
-        
-        //    if ([[baseRequest responseData] length]) {
-        //
-        //        etError = [self filterError:[baseRequest responseData]
-        //                         statusCode:[baseRequest responseStatusCode]];
-        //    }
         
         [self removeLoadingView];
         
@@ -775,7 +775,9 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
 
 - (void (^)(NSProgress *uploadProgress, NSData *data, XLFProgressBlock progress))taskProgressUpdate{
     
+    @weakify(self);
     return ^(NSProgress *uploadProgress, NSData *data, XLFProgressBlock progress){
+        @strongify(self);
         
         CGFloat newProgress = [uploadProgress fractionCompleted] / (CGFloat)[uploadProgress totalUnitCount];
         
@@ -912,19 +914,6 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
     }
 }
 
-+ (NSURLCache*)cacheShareInstance;{
-    
-    static NSURLCache *cache = nil;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        
-        cache = [[NSURLCache alloc] initWithMemoryCapacity:4 * 1024 * 1024
-                                              diskCapacity:20 * 1024 * 1024
-                                                  diskPath:SDCacheFolder(XLFCachePathFolder)];
-    });
-    return cache;
-}
-
 + (NSArray<NSNumber *> *)shareSystemErrorCodes;{
     
     static NSArray<NSNumber *> *systemErrorCodes = nil;
@@ -945,6 +934,24 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
     });
     
     return systemErrorCodes;
+}
+
++ (instancetype)shareManager;{
+    
+    static id shareManager = nil;
+    
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        shareManager = [[[self class] alloc] initWithBaseURL:nil sessionConfiguration:[NSURLSessionConfiguration defaultSessionConfiguration]];
+        
+        AFSecurityPolicy *securityPolicy = [AFSecurityPolicy policyWithPinningMode:AFSSLPinningModeCertificate];
+        
+        [securityPolicy setAllowInvalidCertificates:YES];
+        [securityPolicy setValidatesDomainName:NO];
+        
+        [shareManager setSecurityPolicy:securityPolicy];
+    });
+    return shareManager;
 }
 
 - (instancetype)initWithBaseURL:(NSURL *)url
@@ -1004,7 +1011,6 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
     }
 }
 
-#if NS_BLOCKS_AVAILABLE
 /**
  *  block
  */
@@ -1061,6 +1067,7 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
         [task setTaskTag:tag];
         [task setContainer:self];
         [task setLoadingText:loadingText];
+        [task setHttpParameter:parameters];
         [task setRelationObject:relationObject];
         [task setHiddenLoadingView:hiddenLoadingView];
         
@@ -1069,8 +1076,6 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
     
     return task;
 }
-
-#endif
 
 /**
  *  根据参数创建请求
@@ -1093,20 +1098,48 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
     }];
     
     NSError *serializationError = nil;
-    NSURL *httpRequestURL = [NSURL URLWithString:[parameters handle] relativeToURL:[self baseURL]];
+    
+    NSURL *httpRequestURL = [self baseURL];
+    
+    if ([parameters requestURL]) {
+        httpRequestURL = [parameters requestURL];
+    }
+    
+    [parameters setRequestURL:httpRequestURL];
+    if ([parameters handle]){
+        if(httpRequestURL) {
+            httpRequestURL = [NSURL URLWithString:[parameters handle] relativeToURL:httpRequestURL];
+        }
+        else{
+            httpRequestURL = [NSURL URLWithString:[parameters handle]];
+        }
+    }
     
     if ([parameters pathParameters] && [[parameters pathParameters] count]) {
-        
         httpRequestURL = [NSURL URLWithString:[[parameters pathParameters] componentsJoinedByString:@"/"] relativeToURL:httpRequestURL];
     }
     
-    NSMutableURLRequest *httpRequest = [[self requestSerializer] multipartFormRequestWithMethod:[parameters method] URLString:[httpRequestURL absoluteString] parameters:[parameters formParameters] constructingBodyWithBlock:^(id <AFMultipartFormData> formData){
+    NSMutableURLRequest *httpRequest = nil;
+    
+    if ([[parameters method] isEqualToString:@"POST"]) {
         
-        [[parameters fileParameters] enumerateKeysAndObjectsUsingBlock:^(NSString * _Nonnull key, XLFUploadFile * _Nonnull uploadFile, BOOL * _Nonnull stop) {
+        httpRequest = [[self requestSerializer] multipartFormRequestWithMethod:[parameters method]
+                                                                     URLString:[httpRequestURL absoluteString]
+                                                                    parameters:[parameters formParameters]
+                                                     constructingBodyWithBlock:^(id <AFMultipartFormData> formData){
             
-            [formData appendPartWithFileData:[uploadFile data] name:key fileName:[uploadFile fileName] mimeType:[uploadFile contentType]];
-        }];
-    } error:&serializationError];
+            [[parameters fileParameters] enumerateKeysAndObjectsUsingBlock:^(NSString * _Nonnull key, XLFUploadFile * _Nonnull uploadFile, BOOL * _Nonnull stop) {
+                
+                [formData appendPartWithFileData:[uploadFile data] name:key fileName:[uploadFile fileName] mimeType:[uploadFile contentType]];
+            }];
+        } error:&serializationError];
+    }
+    else{
+        httpRequest = [[self requestSerializer] requestWithMethod:[parameters method]
+                                                        URLString:[httpRequestURL absoluteString]
+                                                       parameters:[parameters queryParameters]
+                                                            error:&serializationError];
+    }
     
     if (serializationError) {
         if (failure) {
@@ -1121,22 +1154,7 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
         return nil;
     }
     
-    httpRequest = [[[self requestSerializer] requestBySerializingRequest:httpRequest withParameters:[parameters queryParameters] error:&serializationError] mutableCopy];
-    
-    if (serializationError) {
-        if (failure) {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wgnu"
-            dispatch_async(self.completionQueue ?: dispatch_get_main_queue(), ^{
-                failure(nil, serializationError);
-            });
-#pragma clang diagnostic pop
-        }
-        
-        return nil;
-    }
-    
-    if ([parameters postBody]) {
+    if ([[parameters method] isEqualToString:@"PUT"] && [parameters postBody]) {
         
         NSData *postBodyData = nil;
         
@@ -1171,15 +1189,26 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
 #endif
             return nil;
         }
+        
+        [httpRequest setHTTPBody:postBodyData];
     }
     
-    __block NSURLSessionDataTask *task = [self uploadTaskWithStreamedRequest:httpRequest progress:^(NSProgress *uploadProgress){
+    __block NSURLSessionDataTask *task = [self dataTaskWithRequest:httpRequest uploadProgress:^(NSProgress *uploadProgress){
         
         id taskDelegate = [self delegateForTask:task];
         
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wundeclared-selector"
         task.taskProgressUpdate(uploadProgress, [taskDelegate performSelector:@selector(mutableData)], progress);
+#pragma clang diagnostic pop
+        
+    } downloadProgress:^(NSProgress *downloadProgress){
+        
+        id taskDelegate = [self delegateForTask:task];
+        
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wundeclared-selector"
+        task.taskProgressUpdate(downloadProgress, [taskDelegate performSelector:@selector(mutableData)], progress);
 #pragma clang diagnostic pop
         
     } completionHandler:^(NSURLResponse * __unused response, id responseObject, NSError *error) {

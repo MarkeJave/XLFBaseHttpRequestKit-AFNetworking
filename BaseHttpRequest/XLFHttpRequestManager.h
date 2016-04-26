@@ -7,7 +7,7 @@
 //
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
-#import "AFNetWorking.h"
+#import <AFNetWorking/AFHTTPSessionManager.h>
 
 #import "XLFProgressViewDelegate.h"
 
@@ -98,6 +98,8 @@ typedef NS_ENUM(NSInteger ,XLFFileType){
 
 @property(nonatomic, copy  ) NSString       *method;
 
+@property(nonatomic, strong) NSURL          *requestURL;
+
 /**
  *  请求操作
  */
@@ -161,6 +163,39 @@ typedef NS_ENUM(NSInteger ,XLFFileType){
 
 @property(nonatomic, strong, readonly) NSMutableArray                     *listeningErrorInfos;
 
++ (instancetype)shareManager;
+
+/**
+ *  移除并取消相关代理的请求
+ *
+ *  @param userTag 用户标记
+ */
+- (void)removeAndCancelAllRequestByTaskTag:(NSInteger)taskTag;
+
+/**
+ *  block
+ */
+- (NSURLSessionTask *)taskWithParameters:(XLFHttpParameter *)parameters
+                                     tag:(NSInteger)tag
+                                 success:(XLFSuccessedBlock)successedBlock
+                                 failure:(XLFFailedBlock)failedBlock;
+
+- (NSURLSessionTask *)taskWithParameters:(XLFHttpParameter *)parameters
+                                     tag:(NSInteger)tag
+                       hiddenLoadingView:(BOOL)hiddenLoadingView
+                          relationObject:(id)relationObject
+                                progress:(XLFProgressBlock)progress
+                                 success:(XLFSuccessedBlock)successedBlock
+                                 failure:(XLFFailedBlock)failedBlock;
+
+- (NSURLSessionTask *)taskWithParameters:(XLFHttpParameter *)parameters
+                                     tag:(NSInteger)tag
+                       hiddenLoadingView:(BOOL)hiddenLoadingView
+                             loadingText:(NSString *)loadingText
+                          relationObject:(id)relationObject
+                                progress:(XLFProgressBlock)progress
+                                 success:(XLFSuccessedBlock)successedBlock
+                                 failure:(XLFFailedBlock)failedBlock;
 
 /**
  *  根据参数创建请求
@@ -176,6 +211,16 @@ typedef NS_ENUM(NSInteger ,XLFFileType){
                                  failure:(XLFFailedBlock)failure;
 
 - (BOOL)shouldListeningError:(NSError *)error;
+
+- (void)registerVisibleViewControllerBlock:(XLFVisibleViewControllerBlock)visibleVCBlock
+                                  isGlobal:(BOOL)isGlobal;
+
++ (void)registerVisibleViewControllerBlockForGlobal:(XLFVisibleViewControllerBlock)visibleVCBlock;
+
+- (void)registerListeningErrorBlock:(XLFListeningErrorBlock)listeningErrorBlock
+                           isGlobal:(BOOL)isGlobal;
+
++ (void)registerListeningErrorBlockForGlobal:(XLFListeningErrorBlock)listeningErrorBlock;
 
 @end
 
