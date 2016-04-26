@@ -10,7 +10,7 @@
 
 #import <UIKit/UIKit.h>
 
-#import "Reachability+Status.h"
 #import "XLFHttpRequestManager.h"
+#import "XLFProgressViewDelegate.h"
 
 #endif

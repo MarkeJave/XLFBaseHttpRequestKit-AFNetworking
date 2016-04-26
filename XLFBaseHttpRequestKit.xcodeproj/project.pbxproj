@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		0D79D33F66D46CB092C29541 /* libPods.a in Frameworks */ = {isa = PBXBuildFile; fileRef = ED12DADEFDBEB87D96F3652C /* libPods.a */; };
 		331E5EF71C0E8FB100ABFCA7 /* MBProgressHUDPrivate.h in Headers */ = {isa = PBXBuildFile; fileRef = 331E5EEE1C0E8FB100ABFCA7 /* MBProgressHUDPrivate.h */; };
 		331E5EF81C0E8FB100ABFCA7 /* MBProgressHUDPrivate.m in Sources */ = {isa = PBXBuildFile; fileRef = 331E5EEF1C0E8FB100ABFCA7 /* MBProgressHUDPrivate.m */; };
 		331E5EFB1C0E8FB100ABFCA7 /* XLFHttpRequestManager.h in Headers */ = {isa = PBXBuildFile; fileRef = 331E5EF21C0E8FB100ABFCA7 /* XLFHttpRequestManager.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -15,7 +14,7 @@
 		331E5EFD1C0E8FB100ABFCA7 /* XLFProgressViewDelegate.h in Headers */ = {isa = PBXBuildFile; fileRef = 331E5EF41C0E8FB100ABFCA7 /* XLFProgressViewDelegate.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		338AB1BC1AB94209009D22A7 /* CFNetwork.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 338AB1BB1AB94209009D22A7 /* CFNetwork.framework */; };
 		338AB1C71AB942BF009D22A7 /* MobileCoreServices.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 338AB1C21AB9428F009D22A7 /* MobileCoreServices.framework */; };
-		B39CD5E71CB7886A0075B10E /* XLFBaseHttpRequestKit.h in Headers */ = {isa = PBXBuildFile; fileRef = B39CD5E51CB7886A0075B10E /* XLFBaseHttpRequestKit.h */; };
+		B39CD5E71CB7886A0075B10E /* XLFBaseHttpRequestKit.h in Headers */ = {isa = PBXBuildFile; fileRef = B39CD5E51CB7886A0075B10E /* XLFBaseHttpRequestKit.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		B39CD5E81CB7886A0075B10E /* XLFLog.h in Headers */ = {isa = PBXBuildFile; fileRef = B39CD5E61CB7886A0075B10E /* XLFLog.h */; };
 /* End PBXBuildFile section */
 
@@ -34,7 +33,6 @@
 		B39CD5E61CB7886A0075B10E /* XLFLog.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = XLFLog.h; sourceTree = "<group>"; };
 		BEEB6278DC9C6AB6A5600AE9 /* Pods.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = Pods.release.xcconfig; path = "Pods/Target Support Files/Pods/Pods.release.xcconfig"; sourceTree = "<group>"; };
 		CEDC936B6216852E9A1BC4A4 /* Pods.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = Pods.debug.xcconfig; path = "Pods/Target Support Files/Pods/Pods.debug.xcconfig"; sourceTree = "<group>"; };
-		ED12DADEFDBEB87D96F3652C /* libPods.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libPods.a; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -44,7 +42,6 @@
 			files = (
 				338AB1C71AB942BF009D22A7 /* MobileCoreServices.framework in Frameworks */,
 				338AB1BC1AB94209009D22A7 /* CFNetwork.framework in Frameworks */,
-				0D79D33F66D46CB092C29541 /* libPods.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -73,13 +70,6 @@
 			path = MBProgressHUD;
 			sourceTree = "<group>";
 		};
-		331E5F0E1C0E90F700ABFCA7 /* XLFBaseHttpRequestKit */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = XLFBaseHttpRequestKit;
-			sourceTree = "<group>";
-		};
 		338AB1741AB93B10009D22A7 = {
 			isa = PBXGroup;
 			children = (
@@ -88,7 +78,6 @@
 				338AB1BD1AB94233009D22A7 /* Security.framework */,
 				338AB1BB1AB94209009D22A7 /* CFNetwork.framework */,
 				331E5EE91C0E8FB100ABFCA7 /* BaseHttpRequest */,
-				331E5F0E1C0E90F700ABFCA7 /* XLFBaseHttpRequestKit */,
 				338AB17F1AB93B10009D22A7 /* Products */,
 				7B382F5104F7F0FB010291B0 /* Pods */,
 				FD79DB0AC821DE16B4C271B8 /* Frameworks */,
@@ -115,7 +104,6 @@
 		FD79DB0AC821DE16B4C271B8 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				ED12DADEFDBEB87D96F3652C /* libPods.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -129,9 +117,9 @@
 			files = (
 				B39CD5E81CB7886A0075B10E /* XLFLog.h in Headers */,
 				331E5EFD1C0E8FB100ABFCA7 /* XLFProgressViewDelegate.h in Headers */,
+				B39CD5E71CB7886A0075B10E /* XLFBaseHttpRequestKit.h in Headers */,
 				331E5EFB1C0E8FB100ABFCA7 /* XLFHttpRequestManager.h in Headers */,
 				331E5EF71C0E8FB100ABFCA7 /* MBProgressHUDPrivate.h in Headers */,
-				B39CD5E71CB7886A0075B10E /* XLFBaseHttpRequestKit.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -178,6 +166,7 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
+				Base,
 			);
 			mainGroup = 338AB1741AB93B10009D22A7;
 			productRefGroup = 338AB17F1AB93B10009D22A7 /* Products */;
@@ -341,12 +330,18 @@
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
-				IPHONEOS_DEPLOYMENT_TARGET = 6.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"${PODS_ROOT}/build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"",
+					"$(PROJECT_DIR)/Pods/build/Debug-iphoneos",
+				);
 				MACH_O_TYPE = staticlib;
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_NAME = XLFBaseHttpRequestKit;
 				SKIP_INSTALL = YES;
+				VALID_ARCHS = "arm64 armv7 armv7s";
 				WARNING_CFLAGS = "-Wno-deprecated-declarations";
 			};
 			name = Debug;
@@ -362,11 +357,17 @@
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
 				FRAMEWORK_SEARCH_PATHS = "$(inherited)";
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
-				IPHONEOS_DEPLOYMENT_TARGET = 6.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"${PODS_ROOT}/build/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)\"",
+					"$(PROJECT_DIR)/Pods/build/Debug-iphoneos",
+				);
 				MACH_O_TYPE = staticlib;
 				PRODUCT_NAME = XLFBaseHttpRequestKit;
 				SKIP_INSTALL = YES;
+				VALID_ARCHS = "arm64 armv7 armv7s";
 				WARNING_CFLAGS = "-Wno-deprecated-declarations";
 			};
 			name = Release;

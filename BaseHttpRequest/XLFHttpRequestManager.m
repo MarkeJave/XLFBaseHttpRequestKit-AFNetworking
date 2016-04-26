@@ -1,7 +1,7 @@
 
 //
 //  XLFHttpRequestManager.m
-//  XLFBaseHttpRequestKit
+//  NSURLSessionTaskKit
 //
 //  Created by Marike Jave on 14-8-25.
 //  Copyright (c) 2014年 Marike Jave. All rights reserved.
@@ -131,58 +131,114 @@
 #endif
 
 NSInteger const XLFHttpRquestNormalTag   = 0;
-NSString *const XLFHttpRquestModeGet     = @"GET";
-NSString *const XLFHttpRquestModePost    = @"POST";
-NSString *const XLFHttpRquestModePut     = @"PUT";
-NSString *const XLFHttpRquestModeDelete  = @"DELETE";
+
+NSString const *XLFHttpRquestMethodGet = @"GET";
+
+NSString const *XLFHttpRquestMethodPost = @"POST";
+
+NSString const *XLFHttpRquestMethodPut = @"PUT";
+
+NSString const *XLFHttpRquestMethodDelete = @"DELETE";
+
+NSString const *XLFHttpRquestMethodHead = @"HEAD";
 
 NSString *const XLFCachePathFolder       = @"WebCache";
 
-VisibleViewControllerBlock XLFVisibleVCBlock = nil;
+XLFVisibleViewControllerBlock   XLFGloableVisibleVCBlock = nil;
+XLFListeningErrorBlock          XLFGloableListeningErrorBlock = nil;
 
-void (^XLFListeningErrorBlock)(id httpRequest, NSError *error);
+static NSError * XLFErrorWithUnderlyingError(NSError *error, NSError *underlyingError) {
+    if (!error) {
+        return underlyingError;
+    }
+    
+    if (!underlyingError || error.userInfo[NSUnderlyingErrorKey]) {
+        return error;
+    }
+    
+    NSMutableDictionary *mutableUserInfo = [error.userInfo mutableCopy];
+    mutableUserInfo[NSUnderlyingErrorKey] = underlyingError;
+    
+    return [[NSError alloc] initWithDomain:error.domain code:error.code userInfo:mutableUserInfo];
+}
+
+static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger code, NSString *domain) {
+    if ([error.domain isEqualToString:domain] && error.code == code) {
+        return YES;
+    } else if (error.userInfo[NSUnderlyingErrorKey]) {
+        return XLFErrorOrUnderlyingErrorHasCodeInDomain(error.userInfo[NSUnderlyingErrorKey], code, domain);
+    }
+    
+    return NO;
+}
+
+@class XLFHttpRequestSetter;
+
+@interface NSURLSessionTask(PrivateExtenssion)
+
+@property(nonatomic, strong) UIView<XLFProgressViewDelegate>    *progressView;
+
+@property(nonatomic, strong) XLFHttpParameter                   *httpParameter;
+
+@property(nonatomic, strong) XLFHttpRequestSetter               *httpRequestSetter;
+
+@property(nonatomic, strong) Class<XLFProgressViewDelegate> progressViewClass;
+
+@property(nonatomic, assign) XLFHttpRequestManager              *container;
+
+@property(nonatomic, assign) id relationObject;
+
+@property(nonatomic, assign) NSInteger taskTag;
+
+@property(nonatomic, assign) BOOL hiddenLoadingView;
+
+@property(nonatomic, copy  ) NSString *loadingText;
+
+@end
 
 @interface XLFHttpRequestSetter : NSObject
 
-@property(nonatomic, strong) NSMutableSet<XLFBaseHttpRequest *> *httpRequests;
+@property(nonatomic, strong) NSMutableSet<NSURLSessionTask *> *tasks;
 
 @end
 
 @implementation XLFHttpRequestSetter
 
-- (NSMutableSet *)httpRequests{
+- (NSMutableSet *)tasks{
     
-    if (!_httpRequests) {
+    if (!_tasks) {
         
-        _httpRequests = [NSMutableSet set];
+        _tasks = [NSMutableSet set];
     }
     
-    return _httpRequests;
+    return _tasks;
 }
 
-- (void)addHttpRequest:(XLFBaseHttpRequest * _Nonnull)httpRequest{
+- (void)addHttpRequest:(NSURLSessionTask * _Nonnull)httpRequest{
     
-    [[self httpRequests] addObject:httpRequest];
+    [[self tasks] addObject:httpRequest];
 }
 
-- (void)removeHttpRequest:(XLFBaseHttpRequest * _Nonnull)httpRequest{
+- (void)removeHttpRequest:(NSURLSessionTask * _Nonnull)httpRequest{
     
-    [[self httpRequests] removeObject:httpRequest];
+    [[self tasks] removeObject:httpRequest];
 }
 
 - (void)dealloc{
     
-    for (XLFBaseHttpRequest * httpRequest in [[self httpRequests] allObjects]) {
+    for (NSURLSessionTask * task in [[self tasks] allObjects]) {
         
-        if ([[httpRequest URLSessionTask] state] != NSURLSessionTaskStateCompleted && ([[httpRequest URLSessionTask] state] != NSURLSessionTaskStateCanceling || [[httpRequest URLSessionTask] state] != NSURLSessionTaskStateSuspended)) {
+        if ([task state] != NSURLSessionTaskStateCompleted && ([task state] != NSURLSessionTaskStateCanceling || [task state] != NSURLSessionTaskStateSuspended)) {
             
-            [httpRequest setRelationObject:nil];
+            [task setRelationObject:nil];
             
-            [[httpRequest URLSessionTask] cancel];
+            [task cancel];
         }
     }
     
-    [[self httpRequests] removeAllObjects];
+    [[self tasks] removeAllObjects];
+    
+    [self setTasks:nil];
 }
 
 @end
@@ -294,7 +350,7 @@ void (^XLFListeningErrorBlock)(id httpRequest, NSError *error);
 
 @interface XLFHttpRequestManager (Private)
 
-@property (nonatomic, strong) NSMutableDictionary *evreqReferrence;
+@property(nonatomic, strong) NSMutableDictionary *evreqReferrence;
 
 @end
 
@@ -332,46 +388,529 @@ void (^XLFListeningErrorBlock)(id httpRequest, NSError *error);
 - (void)dealloc{
     
     [self setHandle:nil];
-    [self setPathParams:nil];
-    [self setQueryParams:nil];
+    [self setPathParameters:nil];
+    [self setQueryParameters:nil];
     [self setPostBody:nil];
-    [self setFormParams:nil];
-    [self setHeadParams:nil];
+    [self setFormParameters:nil];
+    [self setHeadParameters:nil];
 }
 
 - (NSString *)description{
     
     return [@{@"handle":ntoe([self handle]),
-              @"queryParams":ntodefault([self queryParams], @{}),
-              @"formParams":ntodefault([self formParams], @{}),
+              @"queryParameters":ntodefault([self queryParameters], @{}),
+              @"formParameters":ntodefault([self formParameters], @{}),
               @"postBody":ntodefault([self postBody], @{}),
-              @"headParams":ntodefault([self headParams], @{}),
-              @"pathParams":ntodefault([self pathParams], @[])} description];
+              @"headParameters":ntodefault([self headParameters], @{}),
+              @"pathParameters":ntodefault([self pathParameters], @[])} description];
 }
 
 @end
 
-@interface XLFBaseHttpRequest ()
+@implementation NSURLSessionTask (PrivateExtenssion)
 
-@property(nonatomic, strong) NSURLSessionTask *URLSessionTask;
+- (void)clearProperties{
+    
+    if ([self container] && [[self container] evreqReferrence]) {
+        [[[self container] evreqReferrence] removeObjectForKey:[NSNumber numberWithInteger:[self taskTag]]];
+    }
+    
+    if ([self relationObject]) {
+        [[[self relationObject] httpRequestSetter] removeHttpRequest:self];
+    }
+    
+    [self removeLoadingView];
+}
 
-@property(nonatomic, strong) NSURLCache *cache;
+- (NSDictionary*)descriptionInfo{
+    
+    return @{@"url":ntoe([[[self currentRequest] URL] absoluteString]),
+             @"handle":ntoe([[self httpParameter] handle]),
+             @"method":ntoe([[self httpParameter] method]),
+             @"queryParameters":ntodefault([[self httpParameter] queryParameters], @{}),
+             @"formParameters":ntodefault([[self httpParameter] formParameters], @{}),
+             @"postBody":ntodefault([[self httpParameter] postBody], @{}),
+             @"headParameters":ntodefault([[self httpParameter] headParameters], @{}),
+             @"pathParameters":ntodefault([[self httpParameter] pathParameters], @[]),
+             @"taskTag":[NSNumber numberWithInteger:[self taskTag]]};
+}
 
-@property (nonatomic, assign) NSInteger                         requestTag;
-@property (nonatomic, assign) XLFHttpRquestDataType             dataType;
-@property (nonatomic, copy  ) VisibleViewControllerBlock        visibleVCBlock;
+- (void)setProgressView:(UIView<XLFProgressViewDelegate> *)progressView{
+    
+    if ([self progressView] != progressView) {
+        
+        objc_setAssociatedObject(self, @selector(progressView), progressView, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+}
 
-@property (nonatomic, strong) UIView<XLFProgressViewDelegate>   *progressView;
-@property (nonatomic, strong) NSError                           *userError;
-@property (nonatomic, copy  ) id                                result;
+- (UIView<XLFProgressViewDelegate> *)progressView{
+    
+    return objc_getAssociatedObject(self, @selector(progressView));
+}
 
-@property (nonatomic, assign) XLFHttpRequestManager             *container;
+- (void)setHttpParameter:(XLFHttpParameter *)httpParameter{
+    
+    if ([self httpParameter] != httpParameter) {
+        
+        objc_setAssociatedObject(self, @selector(httpParameter), httpParameter, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+}
 
-@property (nonatomic, copy  ) void (^listeningErrorBlock)(id httpRequest, NSError *error);
+- (UIView<XLFProgressViewDelegate> *)httpParameter{
+    
+    return objc_getAssociatedObject(self, @selector(httpParameter));
+}
+
+- (void)setContainer:(XLFHttpRequestManager *)container{
+    
+    if ([self container] != container) {
+        
+        objc_setAssociatedObject(self, @selector(container), container, OBJC_ASSOCIATION_ASSIGN);
+    }
+}
+
+- (XLFHttpRequestManager *)container{
+    
+    return objc_getAssociatedObject(self, @selector(container));
+}
+
+- (void)setRelationObject:(id)relationObject{
+    
+    if ([self relationObject] != relationObject) {
+        
+        objc_setAssociatedObject(self, @selector(relationObject), relationObject, OBJC_ASSOCIATION_ASSIGN);
+    }
+    
+    if (relationObject) {
+        [[relationObject httpRequestSetter] addHttpRequest:self];
+    }
+}
+
+- (id)relationObject{
+    
+    return objc_getAssociatedObject(self, @selector(relationObject));
+}
+
+- (void)setTaskTag:(NSInteger)taskTag{
+    
+    if ([self taskTag] != taskTag) {
+        
+        objc_setAssociatedObject(self, @selector(taskTag), @(taskTag), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+}
+
+- (NSInteger)taskTag{
+    
+    return [objc_getAssociatedObject(self, @selector(taskTag)) integerValue];
+}
+
+- (void)setHiddenLoadingView:(BOOL)hiddenLoadingView{
+    
+    if ([self hiddenLoadingView] != hiddenLoadingView) {
+        
+        objc_setAssociatedObject(self, @selector(hiddenLoadingView), @(hiddenLoadingView), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+}
+
+- (BOOL)hiddenLoadingView{
+    
+    return [objc_getAssociatedObject(self, @selector(hiddenLoadingView)) boolValue];
+}
+
+- (void)setHttpRequestSetter:(XLFHttpRequestSetter *)httpRequestSetter{
+    
+    if ([self httpRequestSetter] != httpRequestSetter) {
+        
+        objc_setAssociatedObject(self, @selector(httpRequestSetter), httpRequestSetter, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+}
+
+- (XLFHttpRequestSetter *)httpRequestSetter{
+    
+    return objc_getAssociatedObject(self, @selector(httpRequestSetter));
+}
+
+- (void)setProgressViewClass:(Class)progressViewClass{
+    
+    if ([self progressViewClass] != progressViewClass) {
+        
+        objc_setAssociatedObject(self, @selector(progressViewClass), progressViewClass, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+}
+
+- (Class)progressViewClass{
+    
+    return objc_getAssociatedObject(self, @selector(progressViewClass));
+}
+
+- (void)setLoadingText:(NSString *)loadingText{
+    
+    if ([self loadingText] != loadingText) {
+        
+        objc_setAssociatedObject(self, @selector(loadingText), loadingText, OBJC_ASSOCIATION_COPY);
+    }
+}
+
+- (NSString *)loadingText{
+    
+    NSString *loadingText = objc_getAssociatedObject(self, @selector(loadingText));
+    if (!loadingText) {
+        loadingText = @"加载中...";
+        objc_setAssociatedObject(self, @selector(loadingText), loadingText, OBJC_ASSOCIATION_COPY);
+    }
+    return loadingText;
+}
+
+- (void)showLoadingView{
+    
+    [self removeLoadingView];
+    
+    UIView *etvVisibleContent = [self visibleContentView];
+    
+    if (![self hiddenLoadingView] && etvVisibleContent) {
+        
+        [etvVisibleContent setUserInteractionEnabled:NO];
+        
+        if (![self progressViewClass]) {
+            [self setProgressViewClass:[MBProgressHUDPrivate class]];
+        }
+        
+        NIF_DEBUG(@"添加loading视图");
+        [self setProgressView:[[self progressViewClass] showProgressString:[self loadingText] inContentView:etvVisibleContent]];
+    }
+}
+
+- (void)removeLoadingView{
+    
+    if ([self progressView]) {
+        
+        NIF_DEBUG(@"移除loading视图");
+        [[[self progressView] superview] setUserInteractionEnabled:YES];
+        [[self progressView] removeFromSuperview];
+    }
+}
+
+- (UIView*)visibleContentView;{
+    
+    UIView *contentView = [[[UIApplication sharedApplication] windows] firstObject];
+    if (![[self container] visibleVCBlock]) {
+        
+        NIF_DEBUG(@"请注册可见视图 efRegisterVisibleViewControllerBlock");
+    }
+    else{
+        
+        UIViewController *visibleVC = [self container].visibleVCBlock(nil,[self hiddenLoadingView]);
+        if (visibleVC && [visibleVC isKindOfClass:[UIViewController class]]) {
+            contentView = [visibleVC view];
+        }
+        else{
+            
+            NIF_DEBUG(@"注册可见视图（efRegisterVisibleViewControllerBlock）不是一个有效视图，请检查");
+        }
+    }
+    return contentView;
+}
+
+- (void)startAsynchronous;{
+    
+    NIF_INFO(@"Request will start with description:\n%@",[self descriptionInfo]);
+    
+    if ([[AFNetworkReachabilityManager sharedManager] isReachable]) {
+        
+        [self showLoadingView];
+        
+        [self resume];
+    }
+    else {
+        
+        [self removeLoadingView];
+        
+        NSError *error = [NSError errorWithDomain:@"网络无连接" code:kCFURLErrorNetworkConnectionLost userInfo:[self descriptionInfo]];
+        
+        [self failedWithError:error failure:nil];
+    }
+}
+
+- (BOOL)filter:(id)responseObject result:/* json or xml */(id*)result error:(NSError **)err;{
+    
+    NSInteger statusCode = [[responseObject objectForKey:@"status"] integerValue];
+    
+    if (statusCode == 200) {
+        
+        *result = [responseObject objectForKey:@"data"];
+        
+        if (![*result isKindOfClass:[NSDictionary class]] && ![*result isKindOfClass:[NSArray class]]) {
+            
+            *result = nil;
+        }
+        
+        return YES;
+    }
+    
+    NSString *msg = ntoe([responseObject objectForKey:@"msg"]);
+    
+    if (![msg length]) {
+        
+        msg = NSLocalizedString(itos(statusCode),nil);
+    }
+    
+    if (err) {
+        
+        *err = [[NSError alloc] initWithDomain:msg code:statusCode userInfo:nil];
+    }
+    
+    return NO;
+}
+
+- (NSError*)filterError:(id)responseObject statusCode:(NSInteger)statusCode;{
+    
+    NIF_INFO(@"%@", responseObject);
+    
+    NSString *msg = ntoe([responseObject objectForKey:@"msg"]);
+    
+    if (![msg length]) {
+        
+        msg = NSLocalizedString(itos(statusCode),nil);
+    }
+    return [[NSError alloc] initWithDomain:msg code:statusCode userInfo:nil];
+}
+
+- (NSError*)systemErrorWithStatusCode:(NSInteger)statusCode errorCode:(NSInteger)errorCode;{
+    
+    NSString *msg = nil;
+    
+    if (statusCode) {
+        msg = NSLocalizedString(itos(statusCode), nil);
+    }
+    if ([msg length]) {
+        return [[NSError alloc] initWithDomain:([msg length] ? msg : @"系统异常") code:statusCode userInfo:nil];
+    }
+    else{
+        msg = NSLocalizedString(itos(errorCode), nil);
+        return [[NSError alloc] initWithDomain:([msg length] ? msg : @"系统异常") code:errorCode userInfo:nil];
+    }
+}
+
+#pragma mark - task delegate
+
+- (nullable void (^)(id _Nullable responseObject, XLFSuccessedBlock success, XLFFailedBlock failure))taskSuccess{
+    
+    @weakify(self);
+    return ^(id _Nullable responseObject, XLFSuccessedBlock success, XLFFailedBlock failure){
+        @strongify(self);
+        
+        [self removeLoadingView];
+        
+        id result = nil;
+        NSError *error = nil;
+        
+        NIF_INFO(@"http string receive:\n%@", responseObject);
+        
+        if (([responseObject isKindOfClass:[NSArray class]] || [responseObject isKindOfClass:[NSDictionary class]]) && [self filter:responseObject result:&result error:&error]) {
+            
+            NIF_INFO(@"Http Request Response: %@", result);
+            
+#if NS_BLOCKS_AVAILABLE
+            if (success) {
+                success(self , result);
+            }
+#endif
+        }
+        else{
+            
+            [self failedWithError:error failure:failure];
+        }
+        
+        [self clearProperties];
+    };
+}
+
+- (nullable void (^)(NSError *error, XLFFailedBlock failure))taskFailed{
+    
+    return ^(NSError *error,  XLFFailedBlock failure){
+        
+        NIF_ERROR(@"%@", error);
+        
+        NSError *newError = [self systemErrorWithStatusCode:[(NSHTTPURLResponse *)[self response] statusCode]
+                                                  errorCode:[error code]];
+        
+        //    if ([[baseRequest responseData] length]) {
+        //
+        //        etError = [self filterError:[baseRequest responseData]
+        //                         statusCode:[baseRequest responseStatusCode]];
+        //    }
+        
+        [self removeLoadingView];
+        
+        [self failedWithError:newError failure:failure];
+        
+        [self clearProperties];
+    };
+}
+
+- (void)failedWithError:(NSError*)error failure:(XLFFailedBlock)failure{
+    
+    NIF_ERROR(@"task : %@ \n error : %@", [self descriptionInfo], error);
+    
+    @synchronized ([self container]) {
+        
+        if ([[self container] shouldListeningError:error] &&
+            [[self container] listeningErrorBlock]) {
+            
+            [self container].listeningErrorBlock(self, error);
+            return;
+        }
+    }
+    if (failure){
+        failure(self, error);
+        return ;
+    }
+    
+    UIView *etvVisibleContent = [self visibleContentView];
+    if (etvVisibleContent) {
+        
+        [[self progressViewClass] showErrorString:[error domain] inContentView:etvVisibleContent duration:2];
+    }
+}
+
+- (void (^)(NSProgress *uploadProgress, NSData *data, XLFProgressBlock progress))taskProgressUpdate{
+    
+    return ^(NSProgress *uploadProgress, NSData *data, XLFProgressBlock progress){
+        
+        CGFloat newProgress = [uploadProgress fractionCompleted] / (CGFloat)[uploadProgress totalUnitCount];
+        
+        if ([self progressView] && [[self progressView] respondsToSelector:@selector(setProgress:)]) {
+            
+            [[self progressView] setProgress:newProgress];
+        }
+        
+        if (progress){
+            
+            progress(self , newProgress , data);
+        }
+    };
+}
 
 @end
 
-@implementation XLFBaseHttpRequest
+@class AFURLSessionManagerTaskDelegate;
+@interface AFHTTPSessionManager (Private)
+
+- (AFURLSessionManagerTaskDelegate *)delegateForTask:(NSURLSessionTask *)task;
+
+- (NSProgress *)uploadProgressForTask:(NSURLSessionTask *)task;
+
+- (NSProgress *)downloadProgressForTask:(NSURLSessionTask *)task;
+
+
+@end
+
+@interface XLFStringResponseSerializer : AFHTTPResponseSerializer
+
+@end
+
+@implementation XLFStringResponseSerializer
+
+- (BOOL)validateResponse:(NSHTTPURLResponse *)response
+                    data:(NSData *)data
+                   error:(NSError * __autoreleasing *)error{
+    
+    BOOL responseIsValid = YES;
+    NSError *validationError = nil;
+    
+    if (response && [response isKindOfClass:[NSHTTPURLResponse class]]) {
+        if (![[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] length] &&
+            !([response MIMEType] == nil && [data length] == 0)) {
+            
+            if ([data length] > 0 && [response URL]) {
+                NSMutableDictionary *mutableUserInfo = [@{
+                                                          NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedStringFromTable(@"Request failed: unacceptable content-type: %@", @"AFNetworking", nil), [response MIMEType]],
+                                                          NSURLErrorFailingURLErrorKey:[response URL],
+                                                          AFNetworkingOperationFailingURLResponseErrorKey: response,
+                                                          } mutableCopy];
+                if (data) {
+                    mutableUserInfo[AFNetworkingOperationFailingURLResponseDataErrorKey] = data;
+                }
+                
+                validationError = XLFErrorWithUnderlyingError([NSError errorWithDomain:AFURLResponseSerializationErrorDomain code:NSURLErrorCannotDecodeContentData userInfo:mutableUserInfo], validationError);
+            }
+            
+            responseIsValid = NO;
+        }
+        
+        if (self.acceptableStatusCodes && ![self.acceptableStatusCodes containsIndex:(NSUInteger)response.statusCode] && [response URL]) {
+            NSMutableDictionary *mutableUserInfo = [@{
+                                                      NSLocalizedDescriptionKey: [NSString stringWithFormat:NSLocalizedStringFromTable(@"Request failed: %@ (%ld)", @"AFNetworking", nil), [NSHTTPURLResponse localizedStringForStatusCode:response.statusCode], (long)response.statusCode],
+                                                      NSURLErrorFailingURLErrorKey:[response URL],
+                                                      AFNetworkingOperationFailingURLResponseErrorKey: response,
+                                                      } mutableCopy];
+            
+            if (data) {
+                mutableUserInfo[AFNetworkingOperationFailingURLResponseDataErrorKey] = data;
+            }
+            
+            validationError = XLFErrorWithUnderlyingError([NSError errorWithDomain:AFURLResponseSerializationErrorDomain code:NSURLErrorBadServerResponse userInfo:mutableUserInfo], validationError);
+            
+            responseIsValid = NO;
+        }
+    }
+    
+    if (error && !responseIsValid) {
+        *error = validationError;
+    }
+    
+    return responseIsValid;
+}
+
+- (id)responseObjectForResponse:(NSURLResponse *)response
+                           data:(NSData *)data
+                          error:(NSError *__autoreleasing *)error
+{
+    if (![self validateResponse:(NSHTTPURLResponse *)response data:data error:error]) {
+        if (!error || XLFErrorOrUnderlyingErrorHasCodeInDomain(*error, NSURLErrorCannotDecodeContentData, AFURLResponseSerializationErrorDomain)) {
+            return nil;
+        }
+    }
+    
+    return [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+}
+
+@end
+
+@interface XLFCompoundResponseSerializer : AFCompoundResponseSerializer
+
+@end
+
+@implementation XLFCompoundResponseSerializer
+
++ (instancetype)serializer{
+    
+    return [self compoundSerializerWithResponseSerializers:@[[AFImageResponseSerializer serializer], [AFJSONResponseSerializer serializer], [AFXMLParserResponseSerializer serializer], [AFPropertyListResponseSerializer serializer], [XLFStringResponseSerializer serializer]]];
+}
+
+@end
+
+@interface XLFHttpRequestManager ()
+
+@property(nonatomic, strong) NSMutableDictionary *referrence;
+
+@property(nonatomic, copy  ) XLFVisibleViewControllerBlock      visibleVCBlock;
+
+@property(nonatomic, copy  ) XLFListeningErrorBlock             listeningErrorBlock;
+
+@property(nonatomic, strong) NSMutableArray                     *listeningErrorInfos;
+
+@end
+
+@implementation XLFHttpRequestManager
+
++ (void)load{
+    [super load];
+    
+    if(![[NSFileManager defaultManager] fileExistsAtPath:SDCacheDirectory]){
+        [[NSFileManager defaultManager] createDirectoryAtPath:SDCacheDirectory withIntermediateDirectories:YES attributes:nil error:nil];
+    }
+}
 
 + (NSURLCache*)cacheShareInstance;{
     
@@ -408,459 +947,266 @@ void (^XLFListeningErrorBlock)(id httpRequest, NSError *error);
     return systemErrorCodes;
 }
 
-- (instancetype)init{
-    self = [super init];
-    
-    if ( self ) {
+- (instancetype)initWithBaseURL:(NSURL *)url
+           sessionConfiguration:(NSURLSessionConfiguration *)configuration
+{
+    self = [super initWithBaseURL:url sessionConfiguration:configuration];
+    if (self) {
         
-        if (XLFVisibleVCBlock) {
-            [self setVisibleVCBlock:XLFVisibleVCBlock];
+        if (XLFGloableVisibleVCBlock) {
+            [self setVisibleVCBlock:XLFGloableVisibleVCBlock];
         }
-        if (XLFListeningErrorBlock) {
-            [self setListeningErrorBlock:XLFListeningErrorBlock];
+        if (XLFGloableListeningErrorBlock) {
+            [self setListeningErrorBlock:XLFGloableListeningErrorBlock];
         }
-        [self setLoadingHintsText:@"加载中..."];
+        
+        [self setResponseSerializer:[XLFCompoundResponseSerializer serializer]];
+        
+        [[self requestSerializer] setHTTPMethodsEncodingParametersInURI:[NSSet setWithObjects:@"GET", @"POST", @"PUT", @"HEAD", @"DELETE", nil]];
     }
     
     return self;
 }
 
-- (void)dealloc{
+- (NSMutableDictionary *)referrence{
     
-    [self clearProperties];
-}
-
-- (void)cancel{
-    
-    [self clearProperties];
-    
-    [[self URLSessionTask] cancel];
-}
-
-- (void)suspend;{
-    
-    [[self URLSessionTask] suspend];
-}
-
-- (void)resume;{
-    
-    [[self URLSessionTask] resume];
-}
-
-- (void)clearProperties{
-    
-    if ([self container] && [[self container] evreqReferrence]) {
-        [[[self container] evreqReferrence] removeObjectForKey:[NSNumber numberWithInteger:[self requestTag]]];
-    }
-    
-    if ([self relationObject]) {
-        [[[self relationObject] httpRequestSetter] removeHttpRequest:self];
-    }
-    
-    [self removeLoadingView];
-    
-    [self setRelationObject:nil];
-    [self setEvUserTag:nil];
-    [self setEvUserInfo:nil];
-    [self setEvDelegate:nil];
-    [self setProgressView:nil];
-    [self setProgressViewClass:nil];
-    [self setVisibleVCBlock:nil];
-    [self setCachePath:nil];
-    [self setLoadingHintsText:nil];
-    [self setFailedBlock:nil];
-    [self setProgressBlock:nil];
-    [self setSuccessedBlock:nil];
-    [self setDidFailureSelector: nil];
-    [self setDidSuccessSelector: nil];
-}
-
-- (NSDictionary*)descriptionInfo{
-    
-    return @{@"url":ntoe([[[self URLSessionTask] currentRequest] description]),
-             @"handle":ntoe([[self parameter] handle]),
-             @"queryParams":ntodefault([[self parameter] queryParams], @{}),
-             @"formParams":ntodefault([[self parameter] formParams], @{}),
-             @"postBody":ntodefault([[self parameter] postBody], @{}),
-             @"headParams":ntodefault([[self parameter] headParams], @{}),
-             @"pathParams":ntodefault([[self parameter] pathParams], @[]),
-             @"requestTag":[NSNumber numberWithInteger:[self requestTag]],
-             @"needCache":[NSNumber numberWithBool:[self needCache]]};
-}
-
-- (void)setNeedCache:(BOOL)needCache{
-    
-    _needCache = needCache;
-    if (needCache) {
+    if (!_referrence) {
         
-        NSURLCache *cache = nil;
-        // 设置缓存
-        if ([[self cachePath] length]){
+        _referrence = [NSMutableDictionary dictionary];
+    }
+    return _referrence;
+}
+
+- (NSMutableArray *)listeningErrorInfos{
+    
+    if (!_listeningErrorInfos) {
+        
+        _listeningErrorInfos = [NSMutableArray array];
+    }
+    return _listeningErrorInfos;
+}
+
+/**
+ *  移除并取消相关代理的请求
+ *
+ *  @param userTag 用户标记
+ */
+- (void)removeAndCancelAllRequestByTaskTag:(NSInteger)taskTag;{
+    
+    NSArray *tasks = [self tasks];
+    
+    for (NSURLSessionTask *task in tasks) {
+        
+        if ([task isKindOfClass:[NSURLSessionTask class]] && [task taskTag] == taskTag) {
             
-            cache = [[NSURLCache alloc] initWithMemoryCapacity:4 * 1024 * 1024
-                                                  diskCapacity:20 * 1024 * 1024
-                                                      diskPath:[self cachePath]];
+            [task cancel];
         }
-        else if ([XLFCachePathFolder length]){
-            
-            cache = [[self class] cacheShareInstance];
-        }
-        else{
-            cache = [NSURLCache sharedURLCache];
-        }
-        [self setCache:cache];
     }
 }
 
-- (void)setRelationObject:(id)relationObject{
+#if NS_BLOCKS_AVAILABLE
+/**
+ *  block
+ */
+- (NSURLSessionTask *)taskWithParameters:(XLFHttpParameter *)parameters
+                                     tag:(NSInteger)tag
+                                 success:(XLFSuccessedBlock)successedBlock
+                                 failure:(XLFFailedBlock)failedBlock;{
     
-    if (_relationObject != relationObject) {
-        _relationObject = relationObject;
-    }
-    
-    if (relationObject) {
-        [[relationObject httpRequestSetter] addHttpRequest:self];
-    }
+    return [self taskWithParameters:parameters
+                                tag:tag
+                  hiddenLoadingView:YES
+                     relationObject:nil
+                           progress:nil
+                            success:successedBlock
+                            failure:failedBlock];
 }
 
-- (BOOL)filter:(id)responseObject result:/* json or xml */(id*)result error:(NSError **)err;{
+- (NSURLSessionTask *)taskWithParameters:(XLFHttpParameter *)parameters
+                                     tag:(NSInteger)tag
+                       hiddenLoadingView:(BOOL)hiddenLoadingView
+                          relationObject:(id)relationObject
+                                progress:(XLFProgressBlock)progress
+                                 success:(XLFSuccessedBlock)successedBlock
+                                 failure:(XLFFailedBlock)failedBlock;{
     
-    NSInteger statusCode = [[responseObject objectForKey:@"status"] integerValue];
-    
-    if (statusCode == 200) {
-        
-        *result = [responseObject objectForKey:@"data"];
-        
-        if (![*result isKindOfClass:[NSDictionary class]] && ![*result isKindOfClass:[NSArray class]]) {
-            
-            *result = nil;
-        }
-        
-        return YES;
-    }
-    
-    NSString *msg = ntoe([responseObject objectForKey:@"msg"]);
-    
-    if (![msg length]) {
-        
-        msg = NSLocalizedString(itos(statusCode),nil);
-    }
-    
-    if (err) {
-        
-        *err = [[NSError alloc] initWithDomain:msg code:statusCode userInfo:[self descInfo]];
-    }
-    
-    return NO;
+    return [self taskWithParameters:parameters
+                                tag:tag
+                  hiddenLoadingView:hiddenLoadingView
+                        loadingText:nil
+                     relationObject:relationObject
+                           progress:progress
+                            success:successedBlock
+                            failure:failedBlock];
 }
 
-- (NSError*)filterError:(id)responseObject statusCode:(NSInteger)statusCode;{
+- (NSURLSessionTask *)taskWithParameters:(XLFHttpParameter *)parameters
+                                     tag:(NSInteger)tag
+                       hiddenLoadingView:(BOOL)hiddenLoadingView
+                             loadingText:(NSString *)loadingText
+                          relationObject:(id)relationObject
+                                progress:(XLFProgressBlock)progress
+                                 success:(XLFSuccessedBlock)successedBlock
+                                 failure:(XLFFailedBlock)failedBlock;{
     
-    NIF_INFO(@"%@", responseObject);
+    NSURLSessionTask *task = [[self referrence] objectForKey:@(tag)];
     
-    NSString *msg = ntoe([responseObject objectForKey:@"msg"]);
+    if (task) {
+        [task cancel];
+    }
     
-    if (![msg length]) {
+    task = [self taskWithParameters:parameters progress:progress success:successedBlock failure:failedBlock];
+    if (task) {
         
-        msg = NSLocalizedString(itos(statusCode),nil);
-    }
-    return [[NSError alloc] initWithDomain:msg code:statusCode userInfo:[self descInfo]];
-}
-
-- (NSError*)systemErrorWithStatusCode:(NSInteger)statusCode errorCode:(NSInteger)errorCode;{
-    
-    NSString *msg = nil;
-    
-    if (statusCode) {
-        msg = NSLocalizedString(itos(statusCode), nil);
-    }
-    if ([msg length]) {
-        return [[NSError alloc] initWithDomain:([msg length] ? msg : @"系统异常") code:statusCode userInfo:nil];
-    }
-    else{
-        msg = NSLocalizedString(itos(errorCode), nil);
-        return [[NSError alloc] initWithDomain:([msg length] ? msg : @"系统异常") code:errorCode userInfo:nil];
-    }
-}
-
-- (BOOL)shouldListeningError:(NSError *)err;{
-    
-    if ([[self listeningErrorInfos] containsObject:itos([err code])]) {
+        [task setTaskTag:tag];
+        [task setContainer:self];
+        [task setLoadingText:loadingText];
+        [task setRelationObject:relationObject];
+        [task setHiddenLoadingView:hiddenLoadingView];
         
-        return YES;
+        [[self referrence] setObject:task forKey:@(tag)];
     }
     
-    return NO;
+    return task;
 }
 
-#pragma mark - request delegate
+#endif
 
-- (nullable void (^)(NSURLSessionDataTask *task, id _Nullable responseObject))requestSuccess{
+/**
+ *  根据参数创建请求
+ *  默认为
+ *
+ *  @param parameters 参数
+ *
+ *  @return 请求对象
+ */
+- (NSURLSessionTask *)taskWithParameters:(XLFHttpParameter *)parameters
+                                progress:(XLFProgressBlock)progress
+                                 success:(XLFSuccessedBlock)success
+                                 failure:(XLFFailedBlock)failure;{
     
     @weakify(self);
-    return ^(NSURLSessionDataTask *task, id _Nullable responseObject){
+    [[parameters headParameters] enumerateKeysAndObjectsUsingBlock:^(id  _Nonnull key, id  _Nonnull obj, BOOL * _Nonnull stop) {
         @strongify(self);
         
-        [self removeLoadingView];
+        [[self requestSerializer] setValue:fmts(@"%@", obj) forHTTPHeaderField:key];
+    }];
+    
+    NSError *serializationError = nil;
+    NSURL *httpRequestURL = [NSURL URLWithString:[parameters handle] relativeToURL:[self baseURL]];
+    
+    if ([parameters pathParameters] && [[parameters pathParameters] count]) {
         
-        if ([self dataType] == XLFHttpRquestDataTypeJson) {
+        httpRequestURL = [NSURL URLWithString:[[parameters pathParameters] componentsJoinedByString:@"/"] relativeToURL:httpRequestURL];
+    }
+    
+    NSMutableURLRequest *httpRequest = [[self requestSerializer] multipartFormRequestWithMethod:[parameters method] URLString:[httpRequestURL absoluteString] parameters:[parameters formParameters] constructingBodyWithBlock:^(id <AFMultipartFormData> formData){
+        
+        [[parameters fileParameters] enumerateKeysAndObjectsUsingBlock:^(NSString * _Nonnull key, XLFUploadFile * _Nonnull uploadFile, BOOL * _Nonnull stop) {
             
-            id result = nil;
-            NSError *err = nil;
-            
-            NIF_INFO(@"http string receive:\n%@", responseObject);
-            
-            if ([self filter:responseObject result:&result error:&err]) {
-                
-                NIF_INFO(@"Http Request Response: %@", result);
-                
-                [self setResult:result];
-                [self setUserError:err];
-                
-                if ([self evDelegate]) {
-                    
-                    if ([[self evDelegate] respondsToSelector:@selector(didFinishReuqestWithJSONValue:request:)]) {
-                        
-                        [[self evDelegate] didFinishReuqestWithJSONValue:result request:self];
-                    }
-                    else if ([[self evDelegate] respondsToSelector:[self didSuccessSelector]]){
-                        
+            [formData appendPartWithFileData:[uploadFile data] name:key fileName:[uploadFile fileName] mimeType:[uploadFile contentType]];
+        }];
+    } error:&serializationError];
+    
+    if (serializationError) {
+        if (failure) {
 #pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-                        [[self evDelegate] performSelector:[self didSuccessSelector] withObject:result withObject:self];
+#pragma clang diagnostic ignored "-Wgnu"
+            dispatch_async(self.completionQueue ?: dispatch_get_main_queue(), ^{
+                failure(nil, serializationError);
+            });
 #pragma clang diagnostic pop
-                    }
+        }
+        
+        return nil;
+    }
+    
+    httpRequest = [[[self requestSerializer] requestBySerializingRequest:httpRequest withParameters:[parameters queryParameters] error:&serializationError] mutableCopy];
+    
+    if (serializationError) {
+        if (failure) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wgnu"
+            dispatch_async(self.completionQueue ?: dispatch_get_main_queue(), ^{
+                failure(nil, serializationError);
+            });
+#pragma clang diagnostic pop
+        }
+        
+        return nil;
+    }
+    
+    if ([parameters postBody]) {
+        
+        NSData *postBodyData = nil;
+        
+        if ([[parameters postBody] isKindOfClass:[NSArray class]] || [[parameters postBody] isKindOfClass:[NSDictionary class]]) {
+            
+            postBodyData = [NSJSONSerialization dataWithJSONObject:[parameters postBody] options:NSJSONWritingPrettyPrinted error:&serializationError];
+            
+            if (serializationError) {
+                if (failure) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wgnu"
+                    dispatch_async(self.completionQueue ?: dispatch_get_main_queue(), ^{
+                        failure(nil, serializationError);
+                    });
+#pragma clang diagnostic pop
                 }
-#if NS_BLOCKS_AVAILABLE
-                else if ([self successedBlock]) {
-                    self.successedBlock(self , result);
-                }
-#endif
-            }
-            else{
                 
-                [self request:self error:err];
+                return nil;
             }
         }
-        else if ([self dataType] == XLFHttpRquestDataTypeByte){
+        else if ([[parameters postBody] isKindOfClass:[NSData class]]){
             
-            if ([self evDelegate]) {
-                
-                if ([[self evDelegate] respondsToSelector:@selector(didFinishReuqestWithData:request:)]) {
-                    
-                    [[self evDelegate] didFinishReuqestWithData:responseObject request:self];
-                }
-                else if ([[self evDelegate] respondsToSelector:[self didSuccessSelector]]){
-                    
+            postBodyData = [parameters postBody];
+        }
+        else if ([[parameters postBody] isKindOfClass:[NSString class]] || [[parameters postBody] isKindOfClass:[NSValue class]]){
+            
+            postBodyData = [[[parameters postBody] description] dataUsingEncoding:NSUTF8StringEncoding];
+        }
+        else {
+#if DEBUG
+            NSLog(@"unable post body with type : %@", [[parameters postBody] class]);
+#endif
+            return nil;
+        }
+    }
+    
+    __block NSURLSessionDataTask *task = [self uploadTaskWithStreamedRequest:httpRequest progress:^(NSProgress *uploadProgress){
+        
+        id taskDelegate = [self delegateForTask:task];
+        
 #pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-                    [[self evDelegate] performSelector:[self didSuccessSelector] withObject:responseObject withObject:self];
+#pragma clang diagnostic ignored "-Wundeclared-selector"
+        task.taskProgressUpdate(uploadProgress, [taskDelegate performSelector:@selector(mutableData)], progress);
 #pragma clang diagnostic pop
-                }
-            }
-#if NS_BLOCKS_AVAILABLE
-            else if ([self successedBlock]) {
-                
-                self.successedBlock(self , responseObject);
-            }
-#endif
+        
+    } completionHandler:^(NSURLResponse * __unused response, id responseObject, NSError *error) {
+        
+        if (error) {
+            task.taskFailed(error, failure);
         }
-        
-        [self clearProperties];
-    };
-}
-
-- (IBAction)requestFailed:(XLFBaseHttpRequest *)baseRequest{
-    
-    NIF_ERROR(@"%@",[[baseRequest URLSessionTask] error]);
-    
-    NSError *etError = [self systemErrorWithStatusCode:[(NSHTTPURLResponse *)[[baseRequest URLSessionTask] response] statusCode]
-                                             errorCode:[[[baseRequest URLSessionTask] error] code]];
-    
-    if ([[baseRequest responseData] length]) {
-        
-        etError = [self filterError:[baseRequest responseData]
-                         statusCode:[baseRequest responseStatusCode]];
-    }
-    
-    [self removeLoadingView];
-    
-    [self request:baseRequest error:etError];
-    
-    [self clearProperties];
-}
-
-- (void)request:(id)baseRequest error:(NSError*)err{
-    
-    NIF_ERROR(@"request : %@ \n error : %@", [baseRequest descriptionInfo], err);
-    
-    [self setUserError:err];
-    
-    if ([self shouldListeningError:err] &&
-        [self listeningErrorBlock]) {
-        
-        self.listeningErrorBlock(self, err);
-        return;
-    }
-    
-    if ([self evDelegate]){
-        
-        if ([[self evDelegate] respondsToSelector:@selector(didFailWithError:request:)]) {
+        else {
             
-            [[self evDelegate] didFailWithError:err request:baseRequest];
-            return ;
+            task.taskSuccess(responseObject, success, failure);
         }
-        else if ([[self evDelegate] respondsToSelector:[self didFailureSelector]]){
-            
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-            [[self evDelegate] performSelector:[self didFailureSelector] withObject:err withObject:baseRequest];
-#pragma clang diagnostic pop
-            return ;
-        }
-    }
+    }];
     
-#if NS_BLOCKS_AVAILABLE
-    else if ([self failedBlock]){
-        
-        self.failedBlock(baseRequest , err);
-        return ;
-    }
-#endif
-    
-    UIView *etvVisibleContent = [self visibleContentView];
-    if (etvVisibleContent) {
-        
-        [[self progressViewClass] showErrorString:[err domain] inContentView:etvVisibleContent duration:2];
-    }
+    return task;
 }
 
-- (void)setProgress:(float)newProgress;{
+- (BOOL)shouldListeningError:(NSError *)error;{
     
-    if ([self progressView] && [[self progressView] respondsToSelector:@selector(setProgress:)]) {
+    if ([[self listeningErrorInfos] containsObject:itos([error code])]) {
         
-        [[self progressView] setProgress:newProgress];
+        return YES;
     }
-    
-    if ([self dataType] == XLFHttpRquestDataTypeJson) {
-        
-        if ([self evDelegate]) {
-            
-            if ([[self evDelegate] respondsToSelector:@selector(didLoadProgress:request:)]) {
-                
-                [[self evDelegate] didLoadProgress:newProgress request:self];
-            }
-            else if ([[self evDelegate] respondsToSelector:[self didProgressSelector]]){
-                
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-                [[self evDelegate] performSelector:[self didProgressSelector] withObject:[NSNumber numberWithFloat:newProgress] withObject:self];
-#pragma clang diagnostic pop
-            }
-        }
-        
-#if NS_BLOCKS_AVAILABLE
-        else if ([self progressBlock]){
-            
-            self.progressBlock(self , newProgress , [self responseData]);
-        }
-#endif
-    }
-    else if ([self dataType] == XLFHttpRquestDataTypeByte){
-        
-        if ([self evDelegate]) {
-            
-            if ([[self evDelegate] respondsToSelector:@selector(didLoadProgress:data:request:)]) {
-                
-                [[self evDelegate] didLoadProgress:newProgress data:[self responseData] request:self];
-            }
-            else if ([[self evDelegate] respondsToSelector:[self didProgressSelector]]){
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-                [[self evDelegate] performSelector:[self didProgressSelector] withObject:[NSNumber numberWithFloat:newProgress] withObject:self];
-#pragma clang diagnostic pop
-            }
-        }
-        
-#if NS_BLOCKS_AVAILABLE
-        else if ([self progressBlock]){
-            
-            self.progressBlock(self , newProgress , [self responseData]);
-        }
-#endif
-    }
-}
-
-- (void)startAsynchronous{
-    
-    NIF_INFO(@"Request will start with description:\n%@",[self descInfo]);
-    
-    if ([Reachability  isHaveNetWork] ) {
-        
-        [self showLoadingView];
-        
-        [super startAsynchronous];
-    }
-    else {
-        
-        [self removeLoadingView];
-        
-        NSError *err = [NSError errorWithDomain:@"网络无连接" code:ASIConnectionFailureErrorType userInfo:[self descInfo]];
-        
-        [self request:self error:err];
-    }
-}
-
-- (void)startSynchronous{
-    
-    if ([Reachability  isHaveNetWork] ) {
-        
-        [self showLoadingView];
-        
-        [super startSynchronous];
-    }
-    else {
-        
-        NSError *err = [NSError errorWithDomain:@"网络无连接" code:ASIConnectionFailureErrorType userInfo:[self descInfo]];
-        
-        [self request:self error:err];
-    }
-    [self removeLoadingView];
-}
-
-- (void)showLoadingView{
-    
-    [self removeLoadingView];
-    
-    UIView *etvVisibleContent = [self visibleContentView];
-    
-    if (![self isHiddenLoadingView] && etvVisibleContent) {
-        
-        [etvVisibleContent setUserInteractionEnabled:NO];
-        
-        if (![self progressViewClass]) {
-            [self setProgressViewClass:[MBProgressHUDPrivate class]];
-        }
-        
-        NIF_DEBUG(@"添加loading视图");
-        [self setProgressView:[[self progressViewClass] showProgressString:[self loadingHintsText] inContentView:etvVisibleContent]];
-    }
-}
-
-- (void)removeLoadingView{
-    
-    if ([self progressView]) {
-        
-        NIF_DEBUG(@"移除loading视图");
-        [[[self progressView] superview] setUserInteractionEnabled:YES];
-        [[self progressView] removeFromSuperview];
-    }
-    
-    [[UIApplication sharedApplication] setNetworkActivityIndicatorVisible:NO];
+    return NO;
 }
 
 #pragma mark - 网络加载状态
-- (void)registerVisibleViewControllerBlock:(VisibleViewControllerBlock)visibleVCBlock
+- (void)registerVisibleViewControllerBlock:(XLFVisibleViewControllerBlock)visibleVCBlock
                                   isGlobal:(BOOL)isGlobal{
     
     if (isGlobal) {
@@ -871,12 +1217,12 @@ void (^XLFListeningErrorBlock)(id httpRequest, NSError *error);
     
 }
 
-+ (void)registerVisibleViewControllerBlockForGlobal:(VisibleViewControllerBlock)visibleVCBlock{
++ (void)registerVisibleViewControllerBlockForGlobal:(XLFVisibleViewControllerBlock)visibleVCBlock{
     
-    XLFVisibleVCBlock = visibleVCBlock;
+    XLFGloableVisibleVCBlock = visibleVCBlock;
 }
 
-- (void)registerListeningErrorBlock:(void (^)(id httpRequest, NSError *error))listeningErrorBlock
+- (void)registerListeningErrorBlock:(XLFListeningErrorBlock)listeningErrorBlock
                            isGlobal:(BOOL)isGlobal;{
     
     if (isGlobal) {
@@ -886,651 +1232,9 @@ void (^XLFListeningErrorBlock)(id httpRequest, NSError *error);
     [self setListeningErrorBlock:listeningErrorBlock];
 }
 
-+ (void)registerListeningErrorBlockForGlobal:(void (^)(id httpRequest, NSError *error))listeningErrorBlock;{
++ (void)registerListeningErrorBlockForGlobal:(XLFListeningErrorBlock)listeningErrorBlock;{
     
-    XLFListeningErrorBlock = listeningErrorBlock;
-}
-
-- (UIView*)visibleContentView;{
-    
-    UIView *contentView = [[[UIApplication sharedApplication] windows] firstObject];
-    if (![self visibleVCBlock]) {
-        
-        NIF_DEBUG(@"请注册可见视图 efRegisterVisibleViewControllerBlock");
-    }
-    else{
-        
-        UIViewController *visibleVC = self.visibleVCBlock(nil,[self isHiddenLoadingView]);
-        if (visibleVC && [visibleVC isKindOfClass:[UIViewController class]]) {
-            contentView = [visibleVC view];
-        }
-        else{
-            
-            NIF_DEBUG(@"注册可见视图（efRegisterVisibleViewControllerBlock）不是一个有效视图，请检查");
-        }
-    }
-    return contentView;
-}
-
-@end
-
-@interface XLFHttpRequestManager ()
-
-@property(nonatomic, strong) NSMutableDictionary *evreqReferrence;
-
-@end
-
-@implementation XLFHttpRequestManager
-
-+ (void)load{
-    [super load];
-    
-    if(![[NSFileManager defaultManager] fileExistsAtPath:SDCacheDirectory]){
-        [[NSFileManager defaultManager] createDirectoryAtPath:SDCacheDirectory withIntermediateDirectories:YES attributes:nil error:nil];
-    }
-}
-
-+ (instancetype)sharedInstance{
-    
-    static id httpRequestManager = nil;
-    
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        
-        httpRequestManager =  [[[self class] alloc] init];
-    });
-    
-    return httpRequestManager;
-}
-
-+ (void)registerHttpRequestClass:(Class)cls;{
-    
-    if ([cls isSubclassOfClass:[XLFBaseHttpRequest class]]) {
-        
-        [[self sharedInstance] setHttpRequestClass:cls];
-    }
-    else{
-        
-        NIF_ERROR(@"register http request class isn't subclass of XLFBaseHttpRequest");
-    }
-}
-
-- (NSMutableDictionary *)evreqReferrence{
-    
-    if (!_evreqReferrence) {
-        
-        _evreqReferrence = [NSMutableDictionary dictionary];
-    }
-    return _evreqReferrence;
-}
-
-/**
- *  移除并取消相关代理的请求
- *
- *  @param delegate 代理
- */
-+ (void)removeAndCancelAllRequestDelegate:(id<XLFHttpRequestDelegate>)delegate;{
-    
-    NSOperationQueue *queue = [ASIHTTPRequest sharedQueue];
-    
-    for (id request in [queue operations]) {
-        
-        if ([request isKindOfClass:[XLFBaseHttpRequest class]] && [request evDelegate] == delegate) {
-            
-            [request clearDelegatesAndCancel];
-        }
-    }
-}
-
-/**
- *  移除并取消相关代理的请求
- *
- *  @param userTag 用户标记
- */
-+ (void)removeAndCancelAllRequestByUserTag:(id)userTag;{
-    
-    NSOperationQueue *queue = [ASIHTTPRequest sharedQueue];
-    
-    for (id request in [queue operations]) {
-        
-        if ([request isKindOfClass:[XLFBaseHttpRequest class]] && [[request evUserTag] isEqual:userTag]) {
-            
-            [request clearDelegatesAndCancel];
-        }
-    }
-}
-
-/**
- *  移除相关代理的请求
- *
- *  @param delegate 代理
- */
-+ (void)removeAllRequestDelegate:(id<XLFHttpRequestDelegate>)delegate;{
-    
-    NSOperationQueue *queue = [ASIHTTPRequest sharedQueue];
-    
-    for (id request in [queue operations]) {
-        
-        if ([request isKindOfClass:[XLFBaseHttpRequest class]] && [request evDelegate] == delegate) {
-            
-            [request setEvDelegate:nil];
-        }
-    }
-}
-
-+ (id)requestWithParams:(XLFHttpParameter *)params
-             httpMethod:(NSString*)method
-                withTag:(NSInteger)tag
-               delegate:(id<XLFHttpRequestDelegate>)delegate{
-    
-    return [self requestWithParams:params
-                        httpMethod:method
-                           withTag:tag
-                 hiddenLoadingView:YES
-                          delegate:delegate];
-}
-
-+ (id)requestWithParams:(XLFHttpParameter *)params
-             httpMethod:(NSString*)method
-                withTag:(NSInteger)tag
-      hiddenLoadingView:(BOOL)hiddenLoadingView
-               delegate:(id<XLFHttpRequestDelegate>)delegate{
-    
-    return [self requestWithParams:params
-                        httpMethod:method
-                          dataType:XLFHttpRquestDataTypeJson
-                           withTag:tag
-                 hiddenLoadingView:hiddenLoadingView
-                          delegate:delegate];
-}
-
-/**
- *  创建请求
- *
- *  @param params   参数
- *  @param method   请求方式
- *  @param dataType 接收数据类型
- *  @param request  当前请求对象
- *  @param tag      标签
- *  @param delegate 代理
- *  @param hiddenLoadingView 影藏加载视图
- *
- *  @return 请求对象
- */
-+ (id)requestWithParams:(XLFHttpParameter *)params
-             httpMethod:(NSString*)method
-               dataType:(XLFHttpRquestDataType)dataType
-                withTag:(NSInteger)tag
-      hiddenLoadingView:(BOOL)hiddenLoadingView
-               delegate:(id<XLFHttpRequestDelegate>)delegate;{
-    
-    XLFBaseHttpRequest *request = [[[self sharedInstance] evreqReferrence] objectForKey:@(tag)];
-    
-    if (request) {
-        [request clearDelegatesAndCancel];
-    }
-    
-    request = [self requestWithParams:params method:method];
-    
-    if (request) {
-        
-        [request setEvDelegate:delegate];
-        
-        [self setupRequest:request
-                httpMethod:method
-                  dataType:dataType
-                   withTag:tag
-         hiddenLoadingView:hiddenLoadingView
-            relationObject:delegate];
-        [request setContainer:[self sharedInstance]];
-        [[[self sharedInstance] evreqReferrence] setObject:request forKey:@(tag)];
-    }
-    return request;
-}
-
-+ (id)fileRequestWithUrl:(NSString*)fileUrl
-                 withTag:(NSInteger)tag
-       hiddenLoadingView:(BOOL)hiddenLoadingView
-                delegate:(id<XLFHttpRequestDelegate>)delegate;{
-    
-    XLFBaseHttpRequest *request = [[[self sharedInstance] evreqReferrence] objectForKey:@(tag)];
-    
-    if (request) {
-        [request clearDelegatesAndCancel];
-    }
-    
-    request = [self fileRequestWithUrl:fileUrl
-                     hiddenLoadingView:hiddenLoadingView
-                              delegate:delegate];
-    
-    if (request) {
-        
-        [request setRequestTag:tag];
-        [request setContainer:[self sharedInstance]];
-        [[[self sharedInstance] evreqReferrence] setObject:request forKey:@(tag)];
-    }
-    
-    return request;
-    
-}
-
-+ (id)fileRequestWithUrl:(NSString*)fileUrl
-       hiddenLoadingView:(BOOL)hiddenLoadingView
-                delegate:(id<XLFHttpRequestDelegate>)delegate;{
-    
-    XLFBaseHttpRequest *request = [self modelFileRequestWithUrl:fileUrl];
-    
-    [request setEvDelegate:delegate];
-    
-    [self setupRequest:request
-            httpMethod:XLFHttpRquestModeGet
-              dataType:XLFHttpRquestDataTypeByte
-               withTag:XLFHttpRquestNormalTag
-     hiddenLoadingView:hiddenLoadingView
-        relationObject:delegate];
-    
-    return request;
-}
-
-/**
- *  Selector
- */
-+ (id)requestWithParams:(XLFHttpParameter *)params
-             httpMethod:(NSString*)method
-                withTag:(NSInteger)tag
-               delegate:(id)delegate
-                success:(SEL)successSelector
-                failure:(SEL)failureSelector;{
-    
-    return [self requestWithParams:params
-                        httpMethod:method
-                           withTag:tag
-                 hiddenLoadingView:YES
-                          delegate:delegate
-                           success:successSelector
-                           failure:failureSelector];
-}
-/**
- *  Selector
- */
-+ (id)requestWithParams:(XLFHttpParameter *)params
-             httpMethod:(NSString*)method
-                withTag:(NSInteger)tag
-      hiddenLoadingView:(BOOL)hiddenLoadingView
-               delegate:(id)delegate
-                success:(SEL)successSelector
-                failure:(SEL)failureSelector;{
-    
-    return [self requestWithParams:params
-                        httpMethod:method
-                          dataType:XLFHttpRquestDataTypeJson
-                           withTag:tag
-                 hiddenLoadingView:hiddenLoadingView
-                          delegate:delegate
-                           success:successSelector
-                           failure:failureSelector];
-}
-
-+ (id)requestWithParams:(XLFHttpParameter *)params
-             httpMethod:(NSString*)method
-               dataType:(XLFHttpRquestDataType)dataType
-                withTag:(NSInteger)tag
-      hiddenLoadingView:(BOOL)hiddenLoadingView
-               delegate:(id)delegate
-                success:(SEL)successSelector
-                failure:(SEL)failureSelector;{
-    
-    XLFBaseHttpRequest *request = [[[self sharedInstance] evreqReferrence] objectForKey:@(tag)];
-    
-    if (request) {
-        [request clearDelegatesAndCancel];
-    }
-    
-    request = [self requestWithParams:params method:method];
-    
-    if (request) {
-        
-        [request setEvDelegate:delegate];
-        [request setDidSuccessSelector:successSelector];
-        [request setDidFailureSelector:failureSelector];
-        
-        [self setupRequest:request
-                httpMethod:method
-                  dataType:dataType
-                   withTag:tag
-         hiddenLoadingView:hiddenLoadingView
-            relationObject:delegate];
-        [request setContainer:[self sharedInstance]];
-        [[[self sharedInstance] evreqReferrence] setObject:request forKey:@(tag)];
-    }
-    
-    return request;
-}
-
-+ (id)fileRequestWithUrl:(NSString*)fileUrl
-                 withTag:(NSInteger)tag
-       hiddenLoadingView:(BOOL)hiddenLoadingView
-                delegate:(id)delegate
-                 success:(SEL)successSelector
-                 failure:(SEL)failureSelector;{
-    
-    XLFBaseHttpRequest *request = [[[self sharedInstance] evreqReferrence] objectForKey:@(tag)];
-    
-    if (request) {
-        [request clearDelegatesAndCancel];
-    }
-    
-    request = [self fileRequestWithUrl:fileUrl
-                     hiddenLoadingView:hiddenLoadingView
-                              delegate:delegate
-                               success:successSelector
-                               failure:failureSelector];
-    
-    if (request) {
-        
-        [request setRequestTag:tag];
-        [request setContainer:[self sharedInstance]];
-        [[[self sharedInstance] evreqReferrence] setObject:request forKey:@(tag)];
-    }
-    
-    return request;
-}
-
-+ (id)fileRequestWithUrl:(NSString*)fileUrl
-       hiddenLoadingView:(BOOL)hiddenLoadingView
-                delegate:(id)delegate
-                 success:(SEL)successSelector
-                 failure:(SEL)failureSelector;{
-    
-    XLFBaseHttpRequest* request = [self modelFileRequestWithUrl:fileUrl];
-    
-    [request setEvDelegate:delegate];
-    [request setDidSuccessSelector:successSelector];
-    [request setDidFailureSelector:failureSelector];
-    
-    [self setupRequest:request
-            httpMethod:XLFHttpRquestModeGet
-              dataType:XLFHttpRquestDataTypeByte
-               withTag:XLFHttpRquestNormalTag
-     hiddenLoadingView:hiddenLoadingView
-        relationObject:delegate];
-    
-    return request;
-}
-
-#if NS_BLOCKS_AVAILABLE
-/**
- *  block
- */
-+ (id)requestWithParams:(XLFHttpParameter *)params
-             httpMethod:(NSString*)method
-                withTag:(NSInteger)tag
-                success:(XLFSuccessedBlock)successedBlock
-                failure:(XLFFailedBlock)failedBlock;{
-    
-    return [self requestWithParams:params
-                        httpMethod:method
-                           withTag:tag
-                 hiddenLoadingView:YES
-                    relationObject:nil
-                           success:successedBlock
-                           failure:failedBlock];
-}
-/**
- *  block
- */
-+ (id)requestWithParams:(XLFHttpParameter *)params
-             httpMethod:(NSString*)method
-                withTag:(NSInteger)tag
-      hiddenLoadingView:(BOOL)hiddenLoadingView
-         relationObject:(id)relationObject
-                success:(XLFSuccessedBlock)successedBlock
-                failure:(XLFFailedBlock)failedBlock;{
-    
-    return [self requestWithParams:params
-                        httpMethod:method
-                          dataType:XLFHttpRquestDataTypeJson
-                           withTag:tag
-                 hiddenLoadingView:hiddenLoadingView
-                    relationObject:relationObject
-                           success:successedBlock
-                           failure:failedBlock];
-}
-
-+ (id)requestWithParams:(XLFHttpParameter *)params
-             httpMethod:(NSString*)method
-               dataType:(XLFHttpRquestDataType)dataType
-                withTag:(NSInteger)tag
-      hiddenLoadingView:(BOOL)hiddenLoadingView
-         relationObject:relationObject
-                success:(XLFSuccessedBlock)successedBlock
-                failure:(XLFFailedBlock)failedBlock;{
-    
-    XLFBaseHttpRequest *request = [[[self sharedInstance] evreqReferrence] objectForKey:@(tag)];
-    
-    if (request) {
-        [request clearDelegatesAndCancel];
-    }
-    
-    request = [self requestWithParams:params method:method];
-    
-    if (request) {
-        
-        [request setSuccessedBlock:successedBlock];
-        [request setFailedBlock:failedBlock];
-        
-        [self setupRequest:request
-                httpMethod:method
-                  dataType:dataType
-                   withTag:tag
-         hiddenLoadingView:hiddenLoadingView
-            relationObject:relationObject];
-        
-        [request setContainer:[self sharedInstance]];
-        [[[self sharedInstance] evreqReferrence] setObject:request forKey:@(tag)];
-    }
-    
-    return request;
-}
-
-+ (id)fileRequestWithUrl:(NSString*)fileUrl
-                 withTag:(NSInteger)tag
-       hiddenLoadingView:(BOOL)hiddenLoadingView
-          relationObject:relationObject
-                 success:(XLFSuccessedBlock)successedBlock
-                 failure:(XLFFailedBlock)failedBlock;{
-    
-    XLFBaseHttpRequest *request = [[[self sharedInstance] evreqReferrence] objectForKey:@(tag)];
-    
-    if (request) {
-        [request clearDelegatesAndCancel];
-    }
-    
-    request = [self fileRequestWithUrl:fileUrl
-                     hiddenLoadingView:hiddenLoadingView
-                        relationObject:relationObject
-                               success:successedBlock
-                               failure:failedBlock];
-    if (request) {
-        
-        [request setRequestTag:tag];
-        [request setContainer:[self sharedInstance]];
-        [[[self sharedInstance] evreqReferrence] setObject:request forKey:@(tag)];
-    }
-    
-    return request;
-}
-
-+ (id)fileRequestWithUrl:(NSString*)fileUrl
-       hiddenLoadingView:(BOOL)hiddenLoadingView
-          relationObject:(id)relationObject
-                 success:(XLFSuccessedBlock)successedBlock
-                 failure:(XLFFailedBlock)failedBlock;{
-    
-    XLFBaseHttpRequest* request = [self modelFileRequestWithUrl:fileUrl];
-    
-    [request setSuccessedBlock:successedBlock];
-    [request setFailedBlock:failedBlock];
-    
-    [self setupRequest:request
-            httpMethod:XLFHttpRquestModeGet
-              dataType:XLFHttpRquestDataTypeByte
-               withTag:XLFHttpRquestNormalTag
-     hiddenLoadingView:hiddenLoadingView
-        relationObject:relationObject];
-    
-    return request;
-}
-
-#endif
-
-+ (void)setupRequest:(id)request
-          httpMethod:(NSString*)method
-            dataType:(XLFHttpRquestDataType)dataType
-             withTag:(NSInteger)tag
-   hiddenLoadingView:(BOOL)hiddenLoadingView
-      relationObject:(id)relationObject{
-    
-    [request setRelationObject:relationObject];
-    [request setRequestTag:tag];
-    [request setHiddenLoadingView:hiddenLoadingView];
-    [request setRequestMethod:method];
-    [request setDataType:dataType];
-    [request setDelegate:request];
-    [request setTimeOutSeconds:150];
-    [request setDownloadProgressDelegate:request];
-    [request setDidFailSelector:@selector(requestFailed:)];
-    [request setDidFinishSelector:@selector(requestFinished:)];
-}
-
-/**
- *  根据参数创建请求
- *  默认为
- *
- *  @param params 参数
- *  @param method 请求类型
- *
- *  @return 请求对象
- */
-+ (id)requestWithParams:(XLFHttpParameter *)parameter
-                 method:(NSString *)method;{
-    
-    NSString *etUrl = [parameter handle];
-    
-    XLFBaseHttpRequest *etRequest = nil;
-    
-    for (id etPathParameter in [parameter pathParams]) {
-        
-        etUrl = [etUrl stringByAppendingFormat:@"/%@",etPathParameter];
-    }
-    
-    if ([parameter queryParams] && [[parameter queryParams] count]) {
-        
-        etUrl = [etUrl stringByAppendingString:@"?"];
-    }
-    
-    if ([parameter queryParams] && [[parameter queryParams] count]) {
-        
-        NSInteger nIndex = 0;
-        
-        for (id etKey in [[parameter queryParams] allKeys]) {
-            
-            id etValue = [[parameter queryParams] objectForKey:etKey];
-            
-            if (([etValue isKindOfClass:[NSString class]] && [etValue length]) ||
-                ([etValue isKindOfClass:[NSNumber class]] && etValue)) {
-                
-                etUrl = [etUrl stringByAppendingFormat:@"%@%@=%@", nIndex ? @"&" : @"", etKey, etValue];
-            }
-            else if ([etValue isKindOfClass:[NSArray class]] || [etValue isKindOfClass:[NSSet class]]) {
-                
-                for (NSString *etSubValue in etValue) {
-                    
-                    etUrl = [etUrl stringByAppendingFormat:@"%@%@=%@", nIndex ? @"&" : @"", etKey, etSubValue];
-                }
-            }
-            else if ([etValue isKindOfClass:[NSDictionary class]]){
-                
-                etUrl = [etUrl stringByAppendingFormat:@"%@%@=%@",nIndex ? @"&" : @"", etKey, [etValue JSONPrivateString]];
-            }
-            
-            nIndex++;
-        }
-    }
-    
-    etUrl = [etUrl stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
-    
-    etRequest = [[[[self sharedInstance] httpRequestClass] alloc] initWithURL:[NSURL URLWithString:etUrl]];
-    
-    if ([parameter formParams] && [[parameter formParams] count]) {
-        
-        for (id etKey in [[parameter formParams] allKeys]) {
-            
-            id etValue = [[parameter formParams] objectForKey:etKey];
-            
-            if ([etValue isKindOfClass:[NSData class]] ) {
-                
-                [etRequest addData:etValue forKey:etKey];
-            }
-            else if([etValue isKindOfClass:[XLFUploadFile class]]){
-                
-                [etRequest addData:[etValue data] withFileName:[etValue fileName] andContentType:[etValue contentType] forKey:etKey];
-            }
-            else if ([etValue isKindOfClass:[NSString class]] || [etValue isKindOfClass:[NSNumber class]]) {
-                
-                [etRequest addPostValue:etValue forKey:etKey];
-            }
-            else if ([etValue isKindOfClass:[NSArray class]] || [etValue isKindOfClass:[NSDictionary class]]){
-                
-                [etRequest addPostValue:[etValue JSONPrivateString] forKey:etKey];
-            }
-            else {
-                NIF_WARN(@"Unknown type of post value");
-            }
-        }
-    }
-    
-    if ([parameter postBody]) {
-        
-        if ([[parameter postBody] isKindOfClass:[NSData class]]) {
-            
-            [etRequest setPostBody:[NSMutableData dataWithData:[parameter postBody]]];
-        }
-        else{
-            
-            NIF_DEBUG(@"%@",[[parameter postBody] JSONPrivateString]);
-            
-            [etRequest setPostBody:[NSMutableData dataWithData:[[parameter postBody] JSONPrivateData]]];
-        }
-        [etRequest addRequestHeader:@"Content-Type" value:@"application/json"];
-    }
-    
-    if ([parameter headParams] && [[parameter headParams] count]) {
-        
-        for (id etKey in [[parameter headParams] allKeys]) {
-            
-            id etValue = [[parameter headParams] objectForKey:etKey];
-            
-            if ([etValue isKindOfClass:[NSString class]]) {
-                
-                [etRequest addRequestHeader:etKey value:etValue];
-            }
-            else{
-                NIF_WARN(@"Unknown type of post value ");
-            }
-        }
-    }
-    
-    [etRequest setParameter:parameter];
-    
-    NIF_DEBUG(@"request url:%@ \n httpMethod:%@\n params:\n%@", etUrl, method, parameter);
-    
-    return etRequest;
-}
-
-+ (id)modelFileRequestWithUrl:(NSString *)url{
-    
-    return nil;
+    XLFGloableListeningErrorBlock = listeningErrorBlock;
 }
 
 @end

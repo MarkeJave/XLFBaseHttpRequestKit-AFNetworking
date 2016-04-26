@@ -2,9 +2,9 @@
 <Workspace
    version = "1.0">
    <FileRef
-      location = "group:XLFBaseHttpRequestKit.xcodeproj">
+      location = "group:XLFBaseHttpRequestKitDemo.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:Pods/Pods.xcodeproj">
+      location = "group:XLFBaseHttpRequestKit.xcodeproj">
    </FileRef>
 </Workspace>
