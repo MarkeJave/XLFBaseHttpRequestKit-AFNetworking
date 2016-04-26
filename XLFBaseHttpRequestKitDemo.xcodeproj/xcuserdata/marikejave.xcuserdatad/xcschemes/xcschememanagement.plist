@@ -4,20 +4,15 @@
 <dict>
 	<key>SchemeUserState</key>
 	<dict>
-		<key>XLFBaseRequestKit.xcscheme_^#shared#^_</key>
+		<key>XLFBaseHttpRequestKitDemo.xcscheme</key>
 		<dict>
 			<key>orderHint</key>
-			<integer>0</integer>
+			<integer>5</integer>
 		</dict>
 	</dict>
 	<key>SuppressBuildableAutocreation</key>
 	<dict>
-		<key>338AB17D1AB93B10009D22A7</key>
-		<dict>
-			<key>primary</key>
-			<true/>
-		</dict>
-		<key>338AB1881AB93B10009D22A7</key>
+		<key>B32DAD151CCF4CD1005B2875</key>
 		<dict>
 			<key>primary</key>
 			<true/>
