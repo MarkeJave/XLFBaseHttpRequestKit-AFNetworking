@@ -8,7 +8,6 @@
 //
 
 #import <objc/runtime.h>
-#import <AFNetWorking/AFURLResponseSerialization.h>
 
 #import "XLFHttpRequestManager.h"
 #import "MBProgressHUDPrivate.h"

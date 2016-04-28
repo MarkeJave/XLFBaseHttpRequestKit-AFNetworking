@@ -8,7 +8,7 @@
 
 #import "ViewController.h"
 
-#import <XLFBaseHttpRequestKit/XLFBaseHttpRequestKit.h>
+#import "XLFBaseHttpRequestKit.h"
 
 @interface ViewController ()
 

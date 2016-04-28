@@ -9,20 +9,13 @@ Pod::Spec.new do |s|
  * Try to keep it short, snappy and to the point.
  * Finally, don't worry about the indent, CocoaPods strips it!
  DESC
- s.homepage = 'https://github.com/MarkeJave/XLFBaseHttpRequestKit'
+ s.homepage = 'https://github.com/MarkeJave/XLFBaseHttpRequestKit-AFNetworking'
  s.license = 'MIT'
  s.author = { 'MarkeJave' => '308865427@qq.com' }
- s.source = { :git => 'https://github.com/MarkeJave/XLFBaseHttpRequestKit.git', :tag => s.version.to_s }
+ s.source = { :git => 'https://github.com/MarkeJave/XLFBaseHttpRequestKit-AFNetworking.git', :tag => s.version.to_s }
  s.source_files = 'BaseHttpRequest/*.{h,m}', 'BaseHttpRequest/**/*.{h,m}'
  s.requires_arc = true
  s.platform = :ios
  s.ios.deployment_target = '7.0'
-
- non_arc_files = 'BaseHttpRequest/JSONKit/JSONPrivateKit.{h,m}'
-
- s.exclude_files = non_arc_files
- s.subspec 'no-arc' do |sna|
-		sna.requires_arc = false
- 		sna.source_files = non_arc_files
-	end
+ s.dependency='AFNetworking' ~> '3.0.0'
  end

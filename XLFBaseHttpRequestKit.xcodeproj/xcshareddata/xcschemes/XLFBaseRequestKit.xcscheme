@@ -14,8 +14,8 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "338AB17D1AB93B10009D22A7"
-               BuildableName = "XLFBaseHttpRequestKit.framework"
+               BlueprintIdentifier = "B359B0AD1CD1DF0C00C7A769"
+               BuildableName = "libXLFBaseHttpRequestKit.a"
                BlueprintName = "XLFBaseHttpRequestKit"
                ReferencedContainer = "container:XLFBaseHttpRequestKit.xcodeproj">
             </BuildableReference>
@@ -56,8 +56,8 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "338AB17D1AB93B10009D22A7"
-            BuildableName = "XLFBaseHttpRequestKit.framework"
+            BlueprintIdentifier = "B359B0AD1CD1DF0C00C7A769"
+            BuildableName = "libXLFBaseHttpRequestKit.a"
             BlueprintName = "XLFBaseHttpRequestKit"
             ReferencedContainer = "container:XLFBaseHttpRequestKit.xcodeproj">
          </BuildableReference>
@@ -78,8 +78,8 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "338AB17D1AB93B10009D22A7"
-            BuildableName = "XLFBaseHttpRequestKit.framework"
+            BlueprintIdentifier = "B359B0AD1CD1DF0C00C7A769"
+            BuildableName = "libXLFBaseHttpRequestKit.a"
             BlueprintName = "XLFBaseHttpRequestKit"
             ReferencedContainer = "container:XLFBaseHttpRequestKit.xcodeproj">
          </BuildableReference>
@@ -96,8 +96,8 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "338AB17D1AB93B10009D22A7"
-            BuildableName = "XLFBaseHttpRequestKit.framework"
+            BlueprintIdentifier = "B359B0AD1CD1DF0C00C7A769"
+            BuildableName = "libXLFBaseHttpRequestKit.a"
             BlueprintName = "XLFBaseHttpRequestKit"
             ReferencedContainer = "container:XLFBaseHttpRequestKit.xcodeproj">
          </BuildableReference>

@@ -7,7 +7,7 @@
 //
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
-#import <AFNetWorking/AFHTTPSessionManager.h>
+#import "AFNetWorking.h"
 
 #import "XLFProgressViewDelegate.h"
 
