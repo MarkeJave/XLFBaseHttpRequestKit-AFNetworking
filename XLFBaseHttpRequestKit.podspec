@@ -1,9 +1,9 @@
 Pod::Spec.new do |s|
- s.name = 'XLFBaseHttpRequestKit'
+ s.name = 'XLFBaseHttpRequestKit-AFNetworking'
  s.version = '1.0.0'
  s.summary = 'A short description of MyPodDemo.'
  s.description = <<-DESC
- A longer description of XLFBaseHttpRequestKit in Markdown format.
+ A longer description of XLFBaseHttpRequestKit-AFNetworking in Markdown format.
  * Think: Why did you write this? What is the focus? What does it do?
  * CocoaPods will be using this to generate tags, and improve search results.
  * Try to keep it short, snappy and to the point.
