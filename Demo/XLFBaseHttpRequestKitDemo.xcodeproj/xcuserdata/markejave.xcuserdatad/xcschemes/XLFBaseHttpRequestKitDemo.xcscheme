@@ -14,7 +14,7 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "B32DAD151CCF4CD1005B2875"
+               BlueprintIdentifier = "B39A3F4D1CD1EE0A000A3A46"
                BuildableName = "XLFBaseHttpRequestKitDemo.app"
                BlueprintName = "XLFBaseHttpRequestKitDemo"
                ReferencedContainer = "container:XLFBaseHttpRequestKitDemo.xcodeproj">
@@ -32,7 +32,7 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "B32DAD151CCF4CD1005B2875"
+            BlueprintIdentifier = "B39A3F4D1CD1EE0A000A3A46"
             BuildableName = "XLFBaseHttpRequestKitDemo.app"
             BlueprintName = "XLFBaseHttpRequestKitDemo"
             ReferencedContainer = "container:XLFBaseHttpRequestKitDemo.xcodeproj">
@@ -55,7 +55,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "B32DAD151CCF4CD1005B2875"
+            BlueprintIdentifier = "B39A3F4D1CD1EE0A000A3A46"
             BuildableName = "XLFBaseHttpRequestKitDemo.app"
             BlueprintName = "XLFBaseHttpRequestKitDemo"
             ReferencedContainer = "container:XLFBaseHttpRequestKitDemo.xcodeproj">
@@ -74,7 +74,7 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "B32DAD151CCF4CD1005B2875"
+            BlueprintIdentifier = "B39A3F4D1CD1EE0A000A3A46"
             BuildableName = "XLFBaseHttpRequestKitDemo.app"
             BlueprintName = "XLFBaseHttpRequestKitDemo"
             ReferencedContainer = "container:XLFBaseHttpRequestKitDemo.xcodeproj">
