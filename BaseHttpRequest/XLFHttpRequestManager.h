@@ -44,20 +44,6 @@ extern NSString const *XLFHttpRquestMethodHead;
 - (id)filterNull;
 @end
 
-@protocol XLFURLSessionDataTaskDelegate <NSObject>
-@optional
-- (void)didFailWithError:(NSError *)err task:(id)task;
-
-#pragma HttpRquestDataTypeJson
-- (void)didFinishReuqestWithJSONValue:(id)json task:(NSURLSessionDataTask *)task;
-- (void)didLoadProgress:(CGFloat)progress task:(NSURLSessionDataTask *)task;
-
-#pragma HttpRquestDataTypeByte
-- (void)didFinishReuqestWithData:(NSData*)responseData task:(NSURLSessionDataTask *)task;
-- (void)didLoadProgress:(CGFloat)progress data:(NSData*)responseData task:(NSURLSessionDataTask *)task;
-
-@end
-
 //  文件类型（0：未知文件，1：office file[office文件] , 2：rar/zip[压缩文件]，3：MP4/avi[视频文件]，4：jpg/png[图片文件]）
 typedef NS_ENUM(NSInteger ,XLFFileType){
     
