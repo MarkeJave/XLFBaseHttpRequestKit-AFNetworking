@@ -193,10 +193,6 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
 
 @property(nonatomic, assign) NSInteger taskTag;
 
-@property(nonatomic, assign) BOOL hiddenLoadingView;
-
-@property(nonatomic, copy  ) NSString *loadingText;
-
 @end
 
 @interface XLFHttpRequestSetter : NSObject
@@ -553,7 +549,7 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
     
     if ([self loadingText] != loadingText) {
         
-        objc_setAssociatedObject(self, @selector(loadingText), loadingText, OBJC_ASSOCIATION_COPY);
+        objc_setAssociatedObject(self, @selector(loadingText), loadingText, OBJC_ASSOCIATION_COPY_NONATOMIC);
     }
 }
 
@@ -562,7 +558,7 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
     NSString *loadingText = objc_getAssociatedObject(self, @selector(loadingText));
     if (!loadingText) {
         loadingText = @"加载中...";
-        objc_setAssociatedObject(self, @selector(loadingText), loadingText, OBJC_ASSOCIATION_COPY);
+        objc_setAssociatedObject(self, @selector(loadingText), loadingText, OBJC_ASSOCIATION_COPY_NONATOMIC);
     }
     return loadingText;
 }
@@ -631,38 +627,112 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
         
         [self removeLoadingView];
         
-        NSError *error = [NSError errorWithDomain:@"网络无连接" code:kCFURLErrorNetworkConnectionLost userInfo:[self descriptionInfo]];
+        NSError *error = [NSError errorWithDomain:@"网络无连接" code:kCFURLErrorNotConnectedToInternet userInfo:[self descriptionInfo]];
         
         [self failedWithError:error failure:nil];
     }
 }
 
-- (BOOL)filter:(id)responseObject result:/* json or xml */(id*)result error:(NSError **)err;{
+- (BOOL)filter:(id)responseObject result:(id*)result error:(NSError **)err;{
     
-    NSInteger statusCode = [[responseObject objectForKey:@"status"] integerValue];
+    NSInteger statusCode = [[self response] isKindOfClass:[NSHTTPURLResponse class]] ? [(NSHTTPURLResponse *)[self response] statusCode] : 0;
+    
+    NSString *message = nil;
     
     if (statusCode == 200) {
         
-        *result = [responseObject objectForKey:@"data"];
+        XLFResponseContentType responseContentType = [[self httpParameter] responseContentType];
         
-        if (![*result isKindOfClass:[NSDictionary class]] && ![*result isKindOfClass:[NSArray class]]) {
+        if (responseContentType & XLFResponseContentTypeJSON) {
             
-            *result = nil;
+            if ([responseObject isKindOfClass:[NSArray class]]) {
+                responseObject = [responseObject firstObject];
+            }
+            if ([responseObject isKindOfClass:[NSDictionary class]]) {
+                
+                if ([[responseObject allKeys] containsObject:@"status"]) {
+                    statusCode = [responseObject objectForKey:@"status"];
+                }
+                if ([[responseObject allKeys] containsObject:@"msg"]) {
+                    message = ntoe([responseObject objectForKey:@"msg"]);
+                }
+                
+                id data = [responseObject objectForKey:@"data"];
+                
+                if ([data isKindOfClass:[NSDictionary class]] || [data isKindOfClass:[NSArray class]]) {
+                    
+                    *result = data;
+                    return YES;
+                }
+                else{
+                    goto error_content_type_unsupport;
+                }
+            }
         }
-        
-        return YES;
+        else if (responseContentType & XLFResponseContentTypeString){
+            
+            if ([responseObject isKindOfClass:[NSString class]]) {
+                *result =  responseObject;
+                return YES;
+            }
+            else{
+                goto error_content_type_unsupport;
+            }
+        }
+        else if (responseContentType & XLFResponseContentTypeImage){
+            if ([responseObject isKindOfClass:[UIImage class]]) {
+                *result = responseObject;
+                return YES;
+            }
+            else{
+                goto error_content_type_unsupport;
+            }
+        }
+        else if (responseContentType & XLFResponseContentTypeData){
+            
+            if ([responseObject isKindOfClass:[NSData class]]) {
+                *result =  [responseObject description];
+                return YES;
+            }
+            else{
+                goto error_content_type_unsupport;
+            }
+        }
+        else if (responseContentType & XLFResponseContentTypeXML){
+            
+            if ([responseObject isKindOfClass:[NSXMLParser class]]) {
+                *result =  responseObject;
+                return YES;
+            }
+            else{
+                goto error_content_type_unsupport;
+            }
+        }
+        else if (responseContentType & XLFResponseContentTypeXML){
+            
+            if ([responseObject isKindOfClass:[NSPropertyListSerialization class]]) {
+                *result =  responseObject;
+                return YES;
+            }
+            else{
+                goto error_content_type_unsupport;
+            }
+        }
     }
+    goto error_happen;
     
-    NSString *msg = ntoe([responseObject objectForKey:@"msg"]);
+error_content_type_unsupport:
+    statusCode = kCFURLErrorDataNotAllowed;
+    message = @"返回数据类型异常";
     
-    if (![msg length]) {
-        
-        msg = NSLocalizedString(itos(statusCode),nil);
+error_happen:
+    
+    if (![message length]) {
+        message = NSLocalizedString(itos(statusCode),nil);
     }
     
     if (err) {
-        
-        *err = [[NSError alloc] initWithDomain:msg code:statusCode userInfo:nil];
+        *err = [[NSError alloc] initWithDomain:message code:statusCode userInfo:nil];
     }
     
     return NO;
@@ -710,9 +780,7 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
         id result = nil;
         NSError *error = nil;
         
-        NIF_INFO(@"http string receive:\n%@", responseObject);
-        
-        if (([responseObject isKindOfClass:[NSArray class]] || [responseObject isKindOfClass:[NSDictionary class]]) && [self filter:responseObject result:&result error:&error]) {
+        if ([self filter:responseObject result:&result error:&error]) {
             
             NIF_INFO(@"Http Request Response: %@", result);
             
@@ -804,10 +872,6 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
 
 - (NSProgress *)downloadProgressForTask:(NSURLSessionTask *)task;
 
-
-@end
-
-@interface XLFStringResponseSerializer : AFHTTPResponseSerializer
 
 @end
 
@@ -1011,9 +1075,16 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
     }
 }
 
-/**
- *  block
- */
+- (NSURLSessionTask *)taskWithParameters:(XLFHttpParameter *)parameters
+                                 success:(XLFSuccessedBlock)successedBlock
+                                 failure:(XLFFailedBlock)failedBlock;{
+    
+    return [self taskWithParameters:parameters
+                                tag:XLFHttpRquestNormalTag
+                            success:successedBlock
+                            failure:failedBlock];
+}
+
 - (NSURLSessionTask *)taskWithParameters:(XLFHttpParameter *)parameters
                                      tag:(NSInteger)tag
                                  success:(XLFSuccessedBlock)successedBlock
@@ -1022,6 +1093,24 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
     return [self taskWithParameters:parameters
                                 tag:tag
                   hiddenLoadingView:YES
+                        loadingText:nil
+                     relationObject:nil
+                           progress:nil
+                            success:successedBlock
+                            failure:failedBlock];
+}
+
+
+- (NSURLSessionTask *)taskWithParameters:(XLFHttpParameter *)parameters
+                                     tag:(NSInteger)tag
+                             loadingText:(NSString *)loadingText
+                                 success:(XLFSuccessedBlock)successedBlock
+                                 failure:(XLFFailedBlock)failedBlock;{
+    
+    return [self taskWithParameters:parameters
+                                tag:tag
+                  hiddenLoadingView:NO
+                        loadingText:loadingText
                      relationObject:nil
                            progress:nil
                             success:successedBlock
@@ -1030,7 +1119,55 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
 
 - (NSURLSessionTask *)taskWithParameters:(XLFHttpParameter *)parameters
                                      tag:(NSInteger)tag
-                       hiddenLoadingView:(BOOL)hiddenLoadingView
+                          relationObject:(id)relationObject
+                                 success:(XLFSuccessedBlock)successedBlock
+                                 failure:(XLFFailedBlock)failedBlock;{
+    
+    return [self taskWithParameters:parameters
+                                tag:tag
+                  hiddenLoadingView:YES
+                        loadingText:nil
+                     relationObject:relationObject
+                           progress:nil
+                            success:successedBlock
+                            failure:failedBlock];
+}
+
+- (NSURLSessionTask *)taskWithParameters:(XLFHttpParameter *)parameters
+                                     tag:(NSInteger)tag
+                             loadingText:(NSString *)loadingText
+                          relationObject:(id)relationObject
+                                 success:(XLFSuccessedBlock)successedBlock
+                                 failure:(XLFFailedBlock)failedBlock;{
+    
+    return [self taskWithParameters:parameters
+                                tag:tag
+                  hiddenLoadingView:NO
+                        loadingText:loadingText
+                     relationObject:relationObject
+                           progress:nil
+                            success:successedBlock
+                            failure:failedBlock];
+}
+
+- (NSURLSessionTask *)taskWithParameters:(XLFHttpParameter *)parameters
+                                     tag:(NSInteger)tag
+                                progress:(XLFProgressBlock)progress
+                                 success:(XLFSuccessedBlock)successedBlock
+                                 failure:(XLFFailedBlock)failedBlock;{
+    
+    return [self taskWithParameters:parameters
+                                tag:tag
+                  hiddenLoadingView:YES
+                        loadingText:nil
+                     relationObject:nil
+                           progress:progress
+                            success:successedBlock
+                            failure:failedBlock];
+}
+
+- (NSURLSessionTask *)taskWithParameters:(XLFHttpParameter *)parameters
+                                     tag:(NSInteger)tag
                           relationObject:(id)relationObject
                                 progress:(XLFProgressBlock)progress
                                  success:(XLFSuccessedBlock)successedBlock
@@ -1038,12 +1175,49 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
     
     return [self taskWithParameters:parameters
                                 tag:tag
-                  hiddenLoadingView:hiddenLoadingView
+                  hiddenLoadingView:YES
                         loadingText:nil
                      relationObject:relationObject
                            progress:progress
                             success:successedBlock
                             failure:failedBlock];
+}
+
+- (NSURLSessionTask *)taskWithParameters:(XLFHttpParameter *)parameters
+                                     tag:(NSInteger)tag
+                             loadingText:(NSString *)loadingText
+                                progress:(XLFProgressBlock)progress
+                                 success:(XLFSuccessedBlock)successedBlock
+                                 failure:(XLFFailedBlock)failedBlock;{
+    
+    return [self taskWithParameters:parameters
+                                tag:tag
+                  hiddenLoadingView:NO
+                        loadingText:loadingText
+                     relationObject:nil
+                           progress:progress
+                            success:successedBlock
+                            failure:failedBlock];
+    
+}
+
+- (NSURLSessionTask *)taskWithParameters:(XLFHttpParameter *)parameters
+                                     tag:(NSInteger)tag
+                             loadingText:(NSString *)loadingText
+                          relationObject:(id)relationObject
+                                progress:(XLFProgressBlock)progress
+                                 success:(XLFSuccessedBlock)successedBlock
+                                 failure:(XLFFailedBlock)failedBlock;{
+    
+    return [self taskWithParameters:parameters
+                                tag:tag
+                  hiddenLoadingView:NO
+                        loadingText:loadingText
+                     relationObject:relationObject
+                           progress:progress
+                            success:successedBlock
+                            failure:failedBlock];
+    
 }
 
 - (NSURLSessionTask *)taskWithParameters:(XLFHttpParameter *)parameters

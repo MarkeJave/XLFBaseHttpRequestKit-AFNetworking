@@ -48,7 +48,7 @@
         
         _evlbRequestUrl = [[UILabel alloc] initWithFrame:CGRectMake(10, 40, CGRectGetWidth([[UIScreen mainScreen] bounds]) - 20, 40)];
         
-        [_evlbRequestUrl setText:@"http://www.cocoachina.com"];
+        [_evlbRequestUrl setText:@"http://img2.3lian.com/2014/f2/110/d/57.jpg"];
     }
     
     return _evlbRequestUrl;
@@ -79,6 +79,7 @@
 - (IBAction)didClickStartRequest:(id)sender{
     
     XLFHttpParameter *etHttpParameter = [[XLFHttpParameter alloc] init];
+    [etHttpParameter setResponseContentType:XLFResponseContentTypeData];
     [etHttpParameter setMethod:@"GET"];
     [etHttpParameter setRequestURL:[NSURL URLWithString:[[self evlbRequestUrl] text]]];
     
@@ -93,6 +94,8 @@
         [[self evtxvResponse] setText:[error description]];
     }];
     
+    [etTask setHiddenLoadingView:NO];
+    [etTask setLoadingText:@"请稍等"];
     [etTask startAsynchronous];
 }
 

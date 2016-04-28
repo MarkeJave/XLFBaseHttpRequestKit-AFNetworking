@@ -68,15 +68,15 @@ typedef NS_ENUM(NSInteger ,XLFFileType){
     XLFFileTypeImage
 };
 
-//typedef NS_ENUM(NSInteger ,XLFResponseContentType){
-//    
-//    XLFResponseContentTypeData      = 1 << 0,
-//    XLFResponseContentTypeString    = 1 << 1,
-//    XLFResponseContentTypeJSON      = 1 << 2,
-//    XLFResponseContentTypeXML       = 1 << 3,
-//    XLFResponseContentTypePropertyList = 1 << 4,
-//    XLFResponseContentTypeImage     = 1 << 5,
-//};
+typedef NS_ENUM(NSInteger ,XLFResponseContentType){
+    
+    XLFResponseContentTypeJSON      = 1 << 0,
+    XLFResponseContentTypeXML       = 1 << 1,
+    XLFResponseContentTypeData      = 1 << 2,
+    XLFResponseContentTypeString    = 1 << 3,
+    XLFResponseContentTypePropertyList = 1 << 4,
+    XLFResponseContentTypeImage     = 1 << 5,
+};
 
 @interface XLFUploadFile : NSObject
 
@@ -96,8 +96,14 @@ typedef NS_ENUM(NSInteger ,XLFFileType){
 
 @interface XLFHttpParameter : NSObject
 
+/**
+ *  请求类型
+ */
 @property(nonatomic, copy  ) NSString       *method;
 
+/**
+ *  请求根域名
+ */
 @property(nonatomic, strong) NSURL          *requestURL;
 
 /**
@@ -135,7 +141,10 @@ typedef NS_ENUM(NSInteger ,XLFFileType){
  */
 @property(nonatomic, strong) id            postBody;
 
-//@property(nonatomic, assign) XLFResponseContentType responseContentType;
+/**
+ *  返回类型
+ */
+@property(nonatomic, assign) XLFResponseContentType responseContentType;
 
 @end
 
@@ -147,11 +156,15 @@ typedef NS_ENUM(NSInteger ,XLFFileType){
 
 @property(nonatomic, assign, readonly) NSInteger taskTag;
 
-@property(nonatomic, assign, readonly) BOOL hiddenLoadingView;
+@property(nonatomic, assign) BOOL hiddenLoadingView;
 
-@property(nonatomic, copy  , readonly) NSString *loadingText;
+@property(nonatomic, copy  ) NSString *loadingText;
 
 - (void)startAsynchronous;
+
+@end
+
+@interface XLFStringResponseSerializer : AFHTTPResponseSerializer
 
 @end
 
@@ -172,17 +185,58 @@ typedef NS_ENUM(NSInteger ,XLFFileType){
  */
 - (void)removeAndCancelAllRequestByTaskTag:(NSInteger)taskTag;
 
-/**
- *  block
- */
 - (NSURLSessionTask *)taskWithParameters:(XLFHttpParameter *)parameters
-                                     tag:(NSInteger)tag
                                  success:(XLFSuccessedBlock)successedBlock
                                  failure:(XLFFailedBlock)failedBlock;
 
 - (NSURLSessionTask *)taskWithParameters:(XLFHttpParameter *)parameters
                                      tag:(NSInteger)tag
-                       hiddenLoadingView:(BOOL)hiddenLoadingView
+                                 success:(XLFSuccessedBlock)successedBlock
+                                 failure:(XLFFailedBlock)failedBlock;
+
+
+- (NSURLSessionTask *)taskWithParameters:(XLFHttpParameter *)parameters
+                                     tag:(NSInteger)tag
+                             loadingText:(NSString *)loadingText
+                                 success:(XLFSuccessedBlock)successedBlock
+                                 failure:(XLFFailedBlock)failedBlock;
+
+- (NSURLSessionTask *)taskWithParameters:(XLFHttpParameter *)parameters
+                                     tag:(NSInteger)tag
+                          relationObject:(id)relationObject
+                                 success:(XLFSuccessedBlock)successedBlock
+                                 failure:(XLFFailedBlock)failedBlock;
+
+- (NSURLSessionTask *)taskWithParameters:(XLFHttpParameter *)parameters
+                                     tag:(NSInteger)tag
+                             loadingText:(NSString *)loadingText
+                          relationObject:(id)relationObject
+                                 success:(XLFSuccessedBlock)successedBlock
+                                 failure:(XLFFailedBlock)failedBlock;
+
+- (NSURLSessionTask *)taskWithParameters:(XLFHttpParameter *)parameters
+                                     tag:(NSInteger)tag
+                                progress:(XLFProgressBlock)progress
+                                 success:(XLFSuccessedBlock)successedBlock
+                                 failure:(XLFFailedBlock)failedBlock;
+
+- (NSURLSessionTask *)taskWithParameters:(XLFHttpParameter *)parameters
+                                     tag:(NSInteger)tag
+                          relationObject:(id)relationObject
+                                progress:(XLFProgressBlock)progress
+                                 success:(XLFSuccessedBlock)successedBlock
+                                 failure:(XLFFailedBlock)failedBlock;
+
+- (NSURLSessionTask *)taskWithParameters:(XLFHttpParameter *)parameters
+                                     tag:(NSInteger)tag
+                             loadingText:(NSString *)loadingText
+                                progress:(XLFProgressBlock)progress
+                                 success:(XLFSuccessedBlock)successedBlock
+                                 failure:(XLFFailedBlock)failedBlock;
+
+- (NSURLSessionTask *)taskWithParameters:(XLFHttpParameter *)parameters
+                                     tag:(NSInteger)tag
+                             loadingText:(NSString *)loadingText
                           relationObject:(id)relationObject
                                 progress:(XLFProgressBlock)progress
                                  success:(XLFSuccessedBlock)successedBlock
@@ -196,19 +250,6 @@ typedef NS_ENUM(NSInteger ,XLFFileType){
                                 progress:(XLFProgressBlock)progress
                                  success:(XLFSuccessedBlock)successedBlock
                                  failure:(XLFFailedBlock)failedBlock;
-
-/**
- *  根据参数创建请求
- *  默认为
- *
- *  @param parameters 参数
- *
- *  @return 请求对象
- */
-- (NSURLSessionTask *)taskWithParameters:(XLFHttpParameter *)parameters
-                                progress:(XLFProgressBlock)progress
-                                 success:(XLFSuccessedBlock)success
-                                 failure:(XLFFailedBlock)failure;
 
 - (BOOL)shouldListeningError:(NSError *)error;
 
