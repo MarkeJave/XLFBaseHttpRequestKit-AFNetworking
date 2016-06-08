@@ -174,6 +174,11 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
     return NO;
 }
 
+
+static inline void af_swizzleSelector(Class theClass, SEL originalSelector, SEL swizzledSelector);
+
+static inline BOOL af_addMethod(Class theClass, SEL selector, Method method);
+
 @class XLFHttpRequestSetter;
 
 @interface NSURLSessionTask(PrivateExtenssion)
@@ -408,6 +413,67 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
 @end
 
 @implementation NSURLSessionTask (PrivateExtenssion)
+
++ (void)load {
+    
+    if (NSClassFromString(@"NSURLSessionTask")) {
+        
+        NSURLSessionConfiguration *configuration = [NSURLSessionConfiguration ephemeralSessionConfiguration];
+        NSURLSession * session = [NSURLSession sessionWithConfiguration:configuration];
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wnonnull"
+        NSURLSessionDataTask *localDataTask = [session dataTaskWithURL:nil];
+#pragma clang diagnostic pop
+        IMP originalAFResumeIMP = method_getImplementation(class_getInstanceMethod([self class], @selector(af_resume)));
+        Class currentClass = [localDataTask class];
+        
+        while (class_getInstanceMethod(currentClass, @selector(resume))) {
+            Class superClass = [currentClass superclass];
+            IMP classResumeIMP = method_getImplementation(class_getInstanceMethod(currentClass, @selector(resume)));
+            IMP superclassResumeIMP = method_getImplementation(class_getInstanceMethod(superClass, @selector(resume)));
+            if (classResumeIMP != superclassResumeIMP &&
+                originalAFResumeIMP != classResumeIMP) {
+                [self swizzleResumeAndSuspendMethodForClass:currentClass];
+            }
+            currentClass = [currentClass superclass];
+        }
+        
+        [localDataTask cancel];
+        [session finishTasksAndInvalidate];
+    }
+}
+
++ (void)swizzleResumeAndSuspendMethodForClass:(Class)theClass {
+    Method resumeMethod = class_getInstanceMethod(self, @selector(xlf_resume));
+    Method suspendMethod = class_getInstanceMethod(self, @selector(xlf_suspend));
+    Method cancelMethod = class_getInstanceMethod(self, @selector(xlf_cancel));
+    
+    if (af_addMethod(theClass, @selector(xlf_resume), resumeMethod)) {
+        af_swizzleSelector(theClass, @selector(resume), @selector(xlf_resume));
+    }
+    
+    if (af_addMethod(theClass, @selector(xlf_suspend), suspendMethod)) {
+        af_swizzleSelector(theClass, @selector(suspend), @selector(xlf_suspend));
+    }
+    
+    if (af_addMethod(theClass, @selector(xlf_cancel), cancelMethod)) {
+        af_swizzleSelector(theClass, @selector(cancel), @selector(xlf_cancel));
+    }
+}
+
+- (void)xlf_resume {
+    [self xlf_resume];
+}
+
+- (void)xlf_suspend {
+    [self xlf_suspend];
+}
+
+- (void)xlf_cancel {
+    [self xlf_cancel];
+    
+    [self clearProperties];
+}
 
 - (void)clearProperties{
     
