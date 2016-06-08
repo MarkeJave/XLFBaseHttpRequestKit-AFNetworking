@@ -689,20 +689,9 @@ static inline BOOL xlf_addMethod(Class theClass, SEL selector, Method method) {
     
     NIF_INFO(@"Request will start with description:\n%@",[self descriptionInfo]);
     
-    if ([[AFNetworkReachabilityManager sharedManager] isReachable]) {
-        
-        [self showLoadingView];
-        
-        [self resume];
-    }
-    else {
-        
-        [self removeLoadingView];
-        
-        NSError *error = [NSError errorWithDomain:@"网络无连接" code:kCFURLErrorNotConnectedToInternet userInfo:[self descriptionInfo]];
-        
-        [self failedWithError:error failure:nil];
-    }
+    [self showLoadingView];
+    
+    [self resume];
 }
 
 - (BOOL)filter:(id)responseObject result:(id*)result error:(NSError **)err;{
