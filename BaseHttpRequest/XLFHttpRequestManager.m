@@ -130,19 +130,19 @@
 #endif
 #endif
 
-NSInteger const XLFHttpRquestNormalTag   = 0;
+NSInteger const XLFHttpRquestNormalTag      = 0;
 
-NSString const *XLFHttpRquestMethodGet = @"GET";
+NSString * const XLFHttpRquestMethodGet     = @"GET";
 
-NSString const *XLFHttpRquestMethodPost = @"POST";
+NSString * const XLFHttpRquestMethodPost    = @"POST";
 
-NSString const *XLFHttpRquestMethodPut = @"PUT";
+NSString * const XLFHttpRquestMethodPut     = @"PUT";
 
-NSString const *XLFHttpRquestMethodDelete = @"DELETE";
+NSString * const XLFHttpRquestMethodDelete  = @"DELETE";
 
-NSString const *XLFHttpRquestMethodHead = @"HEAD";
+NSString * const XLFHttpRquestMethodHead    = @"HEAD";
 
-NSString *const XLFCachePathFolder       = @"WebCache";
+NSString * const XLFCachePathFolder         = @"WebCache";
 
 XLFVisibleViewControllerBlock   XLFGloableVisibleVCBlock = nil;
 XLFListeningErrorBlock          XLFGloableListeningErrorBlock = nil;

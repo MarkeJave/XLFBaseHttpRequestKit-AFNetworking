@@ -30,15 +30,15 @@ typedef void (^XLFOnlyDictionaryResponseSuccessedBlock)(id task, id result, NSDi
 
 extern NSInteger const XLFHttpRquestNormalTag;
 
-extern NSString const *XLFHttpRquestMethodGet;
+extern NSString * const XLFHttpRquestMethodGet;
 
-extern NSString const *XLFHttpRquestMethodPost;
+extern NSString * const XLFHttpRquestMethodPost;
 
-extern NSString const *XLFHttpRquestMethodPut;
+extern NSString * const XLFHttpRquestMethodPut;
 
-extern NSString const *XLFHttpRquestMethodDelete;
+extern NSString * const XLFHttpRquestMethodDelete;
 
-extern NSString const *XLFHttpRquestMethodHead;
+extern NSString * const XLFHttpRquestMethodHead;
 
 @interface NSObject(FilterNull)
 - (id)filterNull;
