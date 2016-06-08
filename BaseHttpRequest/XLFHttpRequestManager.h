@@ -11,8 +11,8 @@
 
 #import "XLFProgressViewDelegate.h"
 
-typedef  UIViewController* (^XLFVisibleViewControllerBlock)(UIView *loadingView,BOOL isHiddenLoadingView);
-typedef  UIViewController* (^XLFListeningErrorBlock)(NSURLSessionTask *task, NSError *error);
+typedef UIViewController* (^XLFVisibleViewControllerBlock)(UIView *loadingView,BOOL isHiddenLoadingView);
+typedef void (^XLFListeningErrorBlock)(NSURLSessionTask *task, NSError *error);
 
 typedef void (^XLFCompleteBlock)();
 typedef void (^XLFSuccessedBlock)(id task, id result) ;

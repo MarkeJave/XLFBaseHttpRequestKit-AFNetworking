@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
  s.name = 'XLFBaseHttpRequestKit_AFNetworking'
- s.version = '1.0.3'
+ s.version = '1.0.4'
  s.summary = 'A short description of MyPodDemo.'
  s.description = <<-DESC
  A longer description of XLFBaseHttpRequestKit-AFNetworking in Markdown format.
