@@ -650,7 +650,7 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
             if ([responseObject isKindOfClass:[NSDictionary class]]) {
                 
                 if ([[responseObject allKeys] containsObject:@"status"]) {
-                    statusCode = [responseObject objectForKey:@"status"];
+                    statusCode = [[responseObject objectForKey:@"status"] integerValue];
                 }
                 if ([[responseObject allKeys] containsObject:@"msg"]) {
                     message = ntoe([responseObject objectForKey:@"msg"]);
@@ -1300,12 +1300,12 @@ error_happen:
                                                                      URLString:[httpRequestURL absoluteString]
                                                                     parameters:[parameters formParameters]
                                                      constructingBodyWithBlock:^(id <AFMultipartFormData> formData){
-            
-            [[parameters fileParameters] enumerateKeysAndObjectsUsingBlock:^(NSString * _Nonnull key, XLFUploadFile * _Nonnull uploadFile, BOOL * _Nonnull stop) {
-                
-                [formData appendPartWithFileData:[uploadFile data] name:key fileName:[uploadFile fileName] mimeType:[uploadFile contentType]];
-            }];
-        } error:&serializationError];
+                                                         
+                                                         [[parameters fileParameters] enumerateKeysAndObjectsUsingBlock:^(NSString * _Nonnull key, XLFUploadFile * _Nonnull uploadFile, BOOL * _Nonnull stop) {
+                                                             
+                                                             [formData appendPartWithFileData:[uploadFile data] name:key fileName:[uploadFile fileName] mimeType:[uploadFile contentType]];
+                                                         }];
+                                                     } error:&serializationError];
     }
     else{
         httpRequest = [[self requestSerializer] requestWithMethod:[parameters method]
