@@ -424,16 +424,16 @@ static inline BOOL af_addMethod(Class theClass, SEL selector, Method method);
 #pragma GCC diagnostic ignored "-Wnonnull"
         NSURLSessionDataTask *localDataTask = [session dataTaskWithURL:nil];
 #pragma clang diagnostic pop
-        IMP originalAFResumeIMP = method_getImplementation(class_getInstanceMethod([self class], @selector(af_resume)));
+        IMP originalCancelIMP = method_getImplementation(class_getInstanceMethod([self class], @selector(af_cancel)));
         Class currentClass = [localDataTask class];
         
-        while (class_getInstanceMethod(currentClass, @selector(resume))) {
+        while (class_getInstanceMethod(currentClass, @selector(cancel))) {
             Class superClass = [currentClass superclass];
-            IMP classResumeIMP = method_getImplementation(class_getInstanceMethod(currentClass, @selector(resume)));
-            IMP superclassResumeIMP = method_getImplementation(class_getInstanceMethod(superClass, @selector(resume)));
-            if (classResumeIMP != superclassResumeIMP &&
-                originalAFResumeIMP != classResumeIMP) {
-                [self swizzleResumeAndSuspendMethodForClass:currentClass];
+            IMP classCancelIMP = method_getImplementation(class_getInstanceMethod(currentClass, @selector(cancel)));
+            IMP superclassCancelIMP = method_getImplementation(class_getInstanceMethod(superClass, @selector(cancel)));
+            if (classCancelIMP != superclassCancelIMP &&
+                originalCancelIMP != classCancelIMP) {
+                [self swizzleResumeAndSuspendAndCancelMethodForClass:currentClass];
             }
             currentClass = [currentClass superclass];
         }
@@ -443,7 +443,7 @@ static inline BOOL af_addMethod(Class theClass, SEL selector, Method method);
     }
 }
 
-+ (void)swizzleResumeAndSuspendMethodForClass:(Class)theClass {
++ (void)swizzleResumeAndSuspendAndCancelMethodForClass:(Class)theClass {
     Method resumeMethod = class_getInstanceMethod(self, @selector(xlf_resume));
     Method suspendMethod = class_getInstanceMethod(self, @selector(xlf_suspend));
     Method cancelMethod = class_getInstanceMethod(self, @selector(xlf_cancel));
