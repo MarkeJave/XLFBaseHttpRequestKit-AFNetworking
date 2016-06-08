@@ -175,9 +175,16 @@ static BOOL XLFErrorOrUnderlyingErrorHasCodeInDomain(NSError *error, NSInteger c
 }
 
 
-static inline void af_swizzleSelector(Class theClass, SEL originalSelector, SEL swizzledSelector);
+static inline void xlf_swizzleSelector(Class theClass, SEL originalSelector, SEL swizzledSelector) {
+    Method originalMethod = class_getInstanceMethod(theClass, originalSelector);
+    Method swizzledMethod = class_getInstanceMethod(theClass, swizzledSelector);
+    method_exchangeImplementations(originalMethod, swizzledMethod);
+}
 
-static inline BOOL af_addMethod(Class theClass, SEL selector, Method method);
+static inline BOOL xlf_addMethod(Class theClass, SEL selector, Method method) {
+    return class_addMethod(theClass, selector,  method_getImplementation(method),  method_getTypeEncoding(method));
+}
+
 
 @class XLFHttpRequestSetter;
 
@@ -448,16 +455,16 @@ static inline BOOL af_addMethod(Class theClass, SEL selector, Method method);
     Method suspendMethod = class_getInstanceMethod(self, @selector(xlf_suspend));
     Method cancelMethod = class_getInstanceMethod(self, @selector(xlf_cancel));
     
-    if (af_addMethod(theClass, @selector(xlf_resume), resumeMethod)) {
-        af_swizzleSelector(theClass, @selector(resume), @selector(xlf_resume));
+    if (xlf_addMethod(theClass, @selector(xlf_resume), resumeMethod)) {
+        xlf_swizzleSelector(theClass, @selector(resume), @selector(xlf_resume));
     }
     
-    if (af_addMethod(theClass, @selector(xlf_suspend), suspendMethod)) {
-        af_swizzleSelector(theClass, @selector(suspend), @selector(xlf_suspend));
+    if (xlf_addMethod(theClass, @selector(xlf_suspend), suspendMethod)) {
+        xlf_swizzleSelector(theClass, @selector(suspend), @selector(xlf_suspend));
     }
     
-    if (af_addMethod(theClass, @selector(xlf_cancel), cancelMethod)) {
-        af_swizzleSelector(theClass, @selector(cancel), @selector(xlf_cancel));
+    if (xlf_addMethod(theClass, @selector(xlf_cancel), cancelMethod)) {
+        xlf_swizzleSelector(theClass, @selector(cancel), @selector(xlf_cancel));
     }
 }
 
