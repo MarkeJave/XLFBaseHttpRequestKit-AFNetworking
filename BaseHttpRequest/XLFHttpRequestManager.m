@@ -1343,7 +1343,7 @@ error_happen:
     [parameters setRequestURL:httpRequestURL];
     if ([parameters handle]){
         if(httpRequestURL) {
-            httpRequestURL = [NSURL URLWithString:[parameters handle] relativeToURL:httpRequestURL];
+            httpRequestURL = [NSURL URLWithString:fmts(@"%@/%@", [httpRequestURL absoluteString], [parameters handle])];
         }
         else{
             httpRequestURL = [NSURL URLWithString:[parameters handle]];

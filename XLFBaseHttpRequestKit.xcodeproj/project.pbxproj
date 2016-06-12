@@ -10,6 +10,8 @@
 		B359B0B81CD1DF9600C7A769 /* XLFBaseHttpRequestKit.h in Headers */ = {isa = PBXBuildFile; fileRef = B39CD5E51CB7886A0075B10E /* XLFBaseHttpRequestKit.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		B359B0BB1CD1DF9600C7A769 /* XLFHttpRequestManager.h in Headers */ = {isa = PBXBuildFile; fileRef = 331E5EF21C0E8FB100ABFCA7 /* XLFHttpRequestManager.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		B359B0BC1CD1DF9600C7A769 /* XLFProgressViewDelegate.h in Headers */ = {isa = PBXBuildFile; fileRef = 331E5EF41C0E8FB100ABFCA7 /* XLFProgressViewDelegate.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		B371A2EB1D0D21DB003462FA /* XLFHttpRequestManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 331E5EF31C0E8FB100ABFCA7 /* XLFHttpRequestManager.m */; };
+		B371A2EC1D0D21EC003462FA /* MBProgressHUDPrivate.m in Sources */ = {isa = PBXBuildFile; fileRef = 331E5EEF1C0E8FB100ABFCA7 /* MBProgressHUDPrivate.m */; };
 		C813AB277A46454455E46595 /* Pods_XLFBaseHttpRequestKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CD6741E5CCFD3D6615AD0089 /* Pods_XLFBaseHttpRequestKit.framework */; };
 /* End PBXBuildFile section */
 
@@ -209,6 +211,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B371A2EC1D0D21EC003462FA /* MBProgressHUDPrivate.m in Sources */,
+				B371A2EB1D0D21DB003462FA /* XLFHttpRequestManager.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
