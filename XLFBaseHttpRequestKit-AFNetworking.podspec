@@ -18,5 +18,5 @@ Pod::Spec.new do |s|
     s.platform = :ios
     s.ios.deployment_target = '7.0'
     s.dependency 'AFNetworking', '~> 3.0.0'
-    s.exclude_files = 'BaseHttpRequest/MBProgressHUD/MBProgressHUDPrivate.{h,m}'
+    s.private_header_files = 'BaseHttpRequest/MBProgressHUD/MBProgressHUDPrivate.{h,m}'
 end
