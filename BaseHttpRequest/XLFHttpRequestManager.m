@@ -1343,15 +1343,14 @@ error_happen:
     [parameters setRequestURL:httpRequestURL];
     if ([parameters handle]){
         if(httpRequestURL) {
-            httpRequestURL = [NSURL URLWithString:fmts(@"%@/%@", [httpRequestURL absoluteString], [parameters handle])];
-        }
-        else{
+            httpRequestURL = [httpRequestURL URLByAppendingPathComponent:[parameters handle]];
+        } else {
             httpRequestURL = [NSURL URLWithString:[parameters handle]];
         }
     }
     
-    if ([parameters pathParameters] && [[parameters pathParameters] count]) {
-        httpRequestURL = [NSURL URLWithString:[[parameters pathParameters] componentsJoinedByString:@"/"] relativeToURL:httpRequestURL];
+    for (NSString * pathParaeter in [parameters pathParameters]) {
+        httpRequestURL = [httpRequestURL URLByAppendingPathComponent:pathParaeter];
     }
     
     NSMutableURLRequest *httpRequest = nil;
