@@ -1340,7 +1340,6 @@ error_happen:
         httpRequestURL = [parameters requestURL];
     }
     
-    [parameters setRequestURL:httpRequestURL];
     if ([parameters handle]){
         if(httpRequestURL) {
             httpRequestURL = [httpRequestURL URLByAppendingPathComponent:[parameters handle]];
@@ -1357,6 +1356,12 @@ error_happen:
     
     if ([[parameters method] isEqualToString:@"POST"]) {
         
+        NSMutableArray *mutablePairs = [NSMutableArray array];
+        [[parameters queryParameters] enumerateKeysAndObjectsUsingBlock:^(id  _Nonnull key, id  _Nonnull obj, BOOL * _Nonnull stop) {
+            [mutablePairs addObject:[NSString stringWithFormat:@"%@=%@", key, obj]];
+        }];
+        NSString *query = [mutablePairs componentsJoinedByString:@"&"];
+        httpRequestURL = [NSURL URLWithString:[[httpRequestURL absoluteString] stringByAppendingFormat:@"?%@", query]];
         httpRequest = [[self requestSerializer] multipartFormRequestWithMethod:[parameters method]
                                                                      URLString:[httpRequestURL absoluteString]
                                                                     parameters:[parameters formParameters]
@@ -1374,7 +1379,6 @@ error_happen:
                                                        parameters:[parameters queryParameters]
                                                             error:&serializationError];
     }
-    
     if (serializationError) {
         if (failure) {
 #pragma clang diagnostic push
@@ -1427,6 +1431,7 @@ error_happen:
         [httpRequest setHTTPBody:postBodyData];
     }
     
+    [parameters setRequestURL:httpRequestURL];
     __block NSURLSessionDataTask *task = [self dataTaskWithRequest:httpRequest uploadProgress:^(NSProgress *uploadProgress){
         
         id taskDelegate = [self delegateForTask:task];
