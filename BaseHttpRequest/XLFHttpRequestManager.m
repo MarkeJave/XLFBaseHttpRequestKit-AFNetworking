@@ -1392,7 +1392,7 @@ error_happen:
         return nil;
     }
     
-    if ([[parameters method] isEqualToString:@"PUT"] && [parameters postBody]) {
+    if ([parameters postBody]) {
         
         NSData *postBodyData = nil;
         
@@ -1412,6 +1412,7 @@ error_happen:
                 
                 return nil;
             }
+            [httpRequest setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
         }
         else if ([[parameters postBody] isKindOfClass:[NSData class]]){
             
