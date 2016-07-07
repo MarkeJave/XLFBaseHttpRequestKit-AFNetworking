@@ -1361,7 +1361,7 @@ error_happen:
             [mutablePairs addObject:[NSString stringWithFormat:@"%@=%@", key, obj]];
         }];
         NSString *query = [mutablePairs componentsJoinedByString:@"&"];
-        httpRequestURL = [NSURL URLWithString:[[httpRequestURL absoluteString] stringByAppendingFormat:@"?%@", query]];
+        httpRequestURL = [NSURL URLWithString:[[httpRequestURL absoluteString] stringByAppendingFormat:@"%@%@", [query length]?@"?":@"", query]];
         httpRequest = [[self requestSerializer] multipartFormRequestWithMethod:[parameters method]
                                                                      URLString:[httpRequestURL absoluteString]
                                                                     parameters:[parameters formParameters]
